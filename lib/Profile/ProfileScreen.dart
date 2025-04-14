@@ -1,15 +1,140 @@
+// import 'package:flutter/material.dart';
+// import 'package:interest_book/Profile/UpdateProfile.dart';
+// import 'package:interest_book/Provider/ProfileProvider.dart';
+// import 'package:interest_book/settledLoan/settledLoanList.dart';
+// import 'package:provider/provider.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
+
+// import '../Login&Signup/LoginScreen.dart';
+// import '../settledLoan/ListOfSettledCustomer.dart';
+
+// class ProfileScreen extends StatelessWidget {
+//   const ProfileScreen({super.key});
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final profile = Provider.of<ProfileProvider>(context);
+
+//     return Scaffold(
+//       appBar: AppBar(
+//         backgroundColor: Colors.blueGrey[300],
+//         automaticallyImplyLeading: false,
+//         title: const Text("Profile"),
+//         actions: [
+//           IconButton(
+//             onPressed: () {
+//               Navigator.of(
+//                 context,
+//               ).push(MaterialPageRoute(builder: (context) => UpdateProfile()));
+//             },
+//             icon: Icon(Icons.edit),
+//           ),
+//           IconButton(
+//             onPressed: () {
+//               showDialog(
+//                 context: context,
+//                 builder: (context) {
+//                   return AlertDialog(
+//                     title: const Text("Are you sure want to logout ??"),
+//                     actions: [
+//                       TextButton(
+//                         onPressed: () async {
+//                           SharedPreferences prefs =
+//                               await SharedPreferences.getInstance();
+//                           prefs.clear();
+//                           Navigator.of(context).pushAndRemoveUntil(
+//                             MaterialPageRoute(
+//                               builder: (context) => const LoginScreen(),
+//                             ),
+//                             (route) => false,
+//                           );
+//                         },
+//                         child: const Text("OK"),
+//                       ),
+//                       TextButton(
+//                         onPressed: () {
+//                           Navigator.pop(context);
+//                         },
+//                         child: const Text("Cancle"),
+//                       ),
+//                     ],
+//                   );
+//                 },
+//               );
+//             },
+//             icon: const Icon(Icons.power_settings_new_rounded),
+//           ),
+//         ],
+//       ),
+//       body: Padding(
+//         padding: const EdgeInsets.all(16.0),
+//         child: SingleChildScrollView(
+//           child: Column(
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             children: [
+//               
+//               Padding(
+//                 padding: const EdgeInsets.only(top: 20),
+//                 child: GestureDetector(
+//                   onTap: () {},
+//                   child: Container(
+//                     height: 50,
+//                     decoration: BoxDecoration(
+//                       border: Border.all(width: 2, color: Colors.blueGrey),
+//                       borderRadius: BorderRadius.circular(20),
+//                     ),
+//                     child: const Padding(
+//                       padding: EdgeInsets.all(8.0),
+//                       child: Center(
+//                         child: Text(
+//                           "Download Report",
+//                           style: TextStyle(
+//                             fontSize: 15,
+//                             fontWeight: FontWeight.bold,
+//                           ),
+//                         ),
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+
 import 'package:flutter/material.dart';
+import 'package:interest_book/Api/UrlConstant.dart';
+import 'package:interest_book/Model/customerLoanData.dart';
 import 'package:interest_book/Profile/UpdateProfile.dart';
 import 'package:interest_book/Provider/ProfileProvider.dart';
+import 'package:interest_book/pdfGenerator/generatePdfWholeCustomerList.dart';
 import 'package:interest_book/settledLoan/settledLoanList.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../Login&Signup/LoginScreen.dart';
 import '../settledLoan/ListOfSettledCustomer.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  Future<List<Customerloandata>> fetchCustomerLoanData() async {
+    final response = await http.get(
+      Uri.parse(UrlConstant.getCustomerLoanData), // Replace with actual URL and dynamic ID
+    );
+
+    if (response.statusCode == 200) {
+      List<dynamic> jsonData = json.decode(response.body);
+      return jsonData.map((item) => Customerloandata.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load report data');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,11 +148,7 @@ class ProfileScreen extends StatelessWidget {
         actions: [
           IconButton(
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => UpdateProfile(),
-                ),
-              );
+              Navigator.of(context).push(MaterialPageRoute(builder: (context) => UpdateProfile()));
             },
             icon: Icon(Icons.edit),
           ),
@@ -41,13 +162,10 @@ class ProfileScreen extends StatelessWidget {
                     actions: [
                       TextButton(
                         onPressed: () async {
-                          SharedPreferences prefs =
-                              await SharedPreferences.getInstance();
+                          SharedPreferences prefs = await SharedPreferences.getInstance();
                           prefs.clear();
                           Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (context) => const LoginScreen(),
-                            ),
+                            MaterialPageRoute(builder: (context) => const LoginScreen()),
                             (route) => false,
                           );
                         },
@@ -57,7 +175,7 @@ class ProfileScreen extends StatelessWidget {
                         onPressed: () {
                           Navigator.pop(context);
                         },
-                        child: const Text("Cancle"),
+                        child: const Text("Cancel"),
                       ),
                     ],
                   );
@@ -82,10 +200,7 @@ class ProfileScreen extends StatelessWidget {
                   padding: EdgeInsets.all(8.0),
                   child: Row(
                     children: [
-                      Text(
-                        "Personal Info.",
-                        style: TextStyle(fontSize: 15),
-                      ),
+                      Text("Personal Info.", style: TextStyle(fontSize: 15)),
                     ],
                   ),
                 ),
@@ -97,10 +212,7 @@ class ProfileScreen extends StatelessWidget {
                   style: const TextStyle(fontSize: 15),
                 ),
               ),
-              const Divider(
-                height: 1,
-                thickness: 2,
-              ),
+              const Divider(height: 1, thickness: 2),
               ListTile(
                 title: const Text("Mobile No."),
                 trailing: Text(
@@ -108,10 +220,7 @@ class ProfileScreen extends StatelessWidget {
                   style: const TextStyle(fontSize: 15),
                 ),
               ),
-              const Divider(
-                height: 1,
-                thickness: 2,
-              ),
+              const Divider(height: 1, thickness: 2),
               ListTile(
                 title: const Text("Email"),
                 trailing: Text(
@@ -119,10 +228,7 @@ class ProfileScreen extends StatelessWidget {
                   style: const TextStyle(fontSize: 15),
                 ),
               ),
-              const Divider(
-                height: 1,
-                thickness: 2,
-              ),
+              const Divider(height: 1, thickness: 2),
               Padding(
                 padding: const EdgeInsets.only(top: 15),
                 child: Container(
@@ -133,10 +239,7 @@ class ProfileScreen extends StatelessWidget {
                     padding: EdgeInsets.all(8.0),
                     child: Row(
                       children: [
-                        Text(
-                          "History",
-                          style: TextStyle(fontSize: 15),
-                        ),
+                        Text("History", style: TextStyle(fontSize: 15)),
                       ],
                     ),
                   ),
@@ -164,15 +267,11 @@ class ProfileScreen extends StatelessWidget {
                         builder: (context) => Settledloanlist(),
                       ),
                     );
-                  
                   },
                   icon: const Icon(Icons.arrow_forward_ios_rounded),
                 ),
               ),
-              const Divider(
-                height: 1,
-                thickness: 2,
-              ),
+              const Divider(height: 1, thickness: 2),
               Padding(
                 padding: const EdgeInsets.only(top: 15),
                 child: Container(
@@ -183,10 +282,7 @@ class ProfileScreen extends StatelessWidget {
                     padding: EdgeInsets.all(8.0),
                     child: Row(
                       children: [
-                        Text(
-                          "Money Info.",
-                          style: TextStyle(fontSize: 15),
-                        ),
+                        Text("Money Info.", style: TextStyle(fontSize: 15)),
                       ],
                     ),
                   ),
@@ -199,10 +295,7 @@ class ProfileScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 15, color: Colors.green),
                 ),
               ),
-              const Divider(
-                height: 1,
-                thickness: 2,
-              ),
+              const Divider(height: 1, thickness: 2),
               const ListTile(
                 title: Text("You got ↑"),
                 trailing: Text(
@@ -210,27 +303,36 @@ class ProfileScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 15, color: Colors.red),
                 ),
               ),
-              const Divider(
-                height: 1,
-                thickness: 2,
-              ),
+              const Divider(height: 1, thickness: 2),
               Padding(
                 padding: const EdgeInsets.only(top: 20),
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                      border: Border.all(
-                        width: 2,
-                        color: Colors.blueGrey,
-                      ),
-                      borderRadius: BorderRadius.circular(20)),
-                  child: const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Center(
-                      child: Text(
-                        "Download Report",
-                        style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.bold),
+                child: GestureDetector(
+                  onTap: () async {
+                    try {
+                      final data = await fetchCustomerLoanData();
+                      await generatePdfFromData(data);
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Failed to generate report: $e")),
+                      );
+                    }
+                  },
+                  child: Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      border: Border.all(width: 2, color: Colors.blueGrey),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Center(
+                        child: Text(
+                          "Download Report",
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ),

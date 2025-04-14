@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:interest_book/Api/fetchAllLoansByUserAndCustomer.dart';
 import 'package:interest_book/Contact/EditContact.dart';
 import 'package:interest_book/DashboardScreen.dart';
 import 'package:interest_book/Loan/ApplyLoan.dart/ApplyLoan.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanList.dart';
 import 'package:interest_book/Model/CustomerModel.dart';
+import 'package:interest_book/Model/getLoanDetailForPDF.dart';
+import 'package:interest_book/pdfGenerator/generatePdfForPerticularCustomer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 
 import '../../Api/RemoveCustomer.dart';
 
@@ -51,10 +55,7 @@ class _LoandashboardState extends State<Loandashboard> {
           },
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
-        title: Text(
-          widget.customer.custName,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: Text(widget.customer.custName, overflow: TextOverflow.ellipsis),
         backgroundColor: Colors.blueGrey[300],
         actions: [
           PopupMenuButton<String>(
@@ -66,8 +67,8 @@ class _LoandashboardState extends State<Loandashboard> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        EditContact(customer: widget.customer),
+                    builder:
+                        (context) => EditContact(customer: widget.customer),
                   ),
                 );
               } else if (value == 'delete') {
@@ -79,11 +80,14 @@ class _LoandashboardState extends State<Loandashboard> {
                       actions: [
                         TextButton(
                           onPressed: () async {
-                            await Removecustomer()
-                                .remove(widget.customer.custId!, userId!);
+                            await Removecustomer().remove(
+                              widget.customer.custId!,
+                              userId!,
+                            );
                             Navigator.of(context).pushAndRemoveUntil(
                               MaterialPageRoute(
-                                  builder: (context) => DashboardScreen()),
+                                builder: (context) => DashboardScreen(),
+                              ),
                               (route) => false,
                             );
                           },
@@ -101,29 +105,30 @@ class _LoandashboardState extends State<Loandashboard> {
                 );
               }
             },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
-                value: 'call',
-                child: ListTile(
-                  leading: Icon(Icons.call),
-                  title: Text('Call'),
-                ),
-              ),
-              const PopupMenuItem<String>(
-                value: 'edit',
-                child: ListTile(
-                  leading: Icon(Icons.edit),
-                  title: Text('Edit'),
-                ),
-              ),
-              const PopupMenuItem<String>(
-                value: 'delete',
-                child: ListTile(
-                  leading: Icon(Icons.delete),
-                  title: Text('Delete'),
-                ),
-              ),
-            ],
+            itemBuilder:
+                (BuildContext context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'call',
+                    child: ListTile(
+                      leading: Icon(Icons.call),
+                      title: Text('Call'),
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'edit',
+                    child: ListTile(
+                      leading: Icon(Icons.edit),
+                      title: Text('Edit'),
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'delete',
+                    child: ListTile(
+                      leading: Icon(Icons.delete),
+                      title: Text('Delete'),
+                    ),
+                  ),
+                ],
           ),
         ],
       ),
@@ -165,21 +170,61 @@ class _LoandashboardState extends State<Loandashboard> {
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const Divider(
-                                height: 2,
-                                color: Colors.black,
-                              ),
+                              const Divider(height: 2, color: Colors.black),
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   IconButton(
-                                    onPressed: () {},
+                                    onPressed: () async {
+                                      try {
+                                        print('Fetching data...');
+                                        final data =
+                                            await fetchAllLoansByUserAndCustomer(
+                                              custId: int.parse(
+                                                widget.customer.custId
+                                                    .toString(),
+                                              ),
+                                              userId: int.parse(
+                                                widget.customer.userId
+                                                    .toString(),
+                                              ),
+                                            );
+                                        print(
+                                          'Data fetched successfully: ${data.length} items',
+                                        );
+
+                                        print('Generating PDF...');
+                                        await generatePdfForPerticulatCustomer(
+                                          data: data,
+                                          customerName:
+                                              widget.customer.custName,
+                                        );
+                                        print('PDF generated successfully');
+                                      } catch (e, stacktrace) {
+                                        print(
+                                          'Error during PDF generation: $e',
+                                        );
+                                        print('Stacktrace: $stacktrace');
+
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Failed to generate report: $e',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
                                     icon: const Icon(Icons.picture_as_pdf),
                                   ),
+
                                   const Image(
-                                    image:
-                                        AssetImage('assest/WhatsappIcon.png'),
+                                    image: AssetImage(
+                                      'assest/WhatsappIcon.png',
+                                    ),
                                     height: 30,
                                   ),
                                   IconButton(
@@ -187,7 +232,7 @@ class _LoandashboardState extends State<Loandashboard> {
                                     icon: const Icon(Icons.message_rounded),
                                   ),
                                 ],
-                              )
+                              ),
                             ],
                           ),
                         ),
@@ -195,10 +240,7 @@ class _LoandashboardState extends State<Loandashboard> {
                     ),
                     const Padding(
                       padding: EdgeInsets.only(top: 8, bottom: 8),
-                      child: VerticalDivider(
-                        width: 2,
-                        color: Colors.black,
-                      ),
+                      child: VerticalDivider(width: 2, color: Colors.black),
                     ),
                     Container(
                       height: 100,
@@ -225,10 +267,7 @@ class _LoandashboardState extends State<Loandashboard> {
                                 color: Colors.red,
                               ),
                             ),
-                            Divider(
-                              height: 2,
-                              color: Colors.red,
-                            ),
+                            Divider(height: 2, color: Colors.red),
                             Text(
                               "₹23,700",
                               style: TextStyle(
@@ -278,10 +317,7 @@ class _LoandashboardState extends State<Loandashboard> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: Colors.black,
-                    width: 2,
-                  ),
+                  border: Border.all(color: Colors.black, width: 2),
                 ),
                 child: const Center(
                   child: Text(

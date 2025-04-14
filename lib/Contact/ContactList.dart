@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:contacts_service/contacts_service.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:interest_book/Contact/AddNewContact.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter/services.dart';
 
 class ContactList extends StatefulWidget {
   const ContactList({Key? key, required this.title});
@@ -35,21 +32,25 @@ class _ContactListState extends State<ContactList> {
   }
 
   void getContacts() async {
-    if (await Permission.contacts.isGranted) {
-      fetchContacts();
-    } else {
-      await Permission.contacts.request();
-    }
+  if (await FlutterContacts.requestPermission()) {
+    print('Permission granted');
+    fetchContacts();
+  } else {
+    print('Permission denied');
+    setState(() => isLoading = false);
   }
+}
+
 
   void fetchContacts() async {
-    List<Contact> fetchedContacts = await ContactsService.getContacts();
+  List<Contact> fetchedContacts = await FlutterContacts.getContacts(withProperties: true);
+  print('Fetched contacts: ${fetchedContacts.length}');
+  setState(() {
+    contacts = fetchedContacts;
+    isLoading = false;
+  });
+}
 
-    setState(() {
-      contacts = fetchedContacts;
-      isLoading = false;
-    });
-  }
 
   void performSearch(String query) {
     if (query.isEmpty) {
@@ -60,21 +61,12 @@ class _ContactListState extends State<ContactList> {
     }
 
     List<Contact> filteredContacts = contacts.where((contact) {
-      final fullName =
-          "${contact.givenName} ${contact.middleName} ${contact.familyName}"
-              .toLowerCase();
+      final fullName = contact.displayName.toLowerCase();
+      final phoneNumberMatches = contact.phones.any(
+        (phone) => phone.number.contains(query),
+      );
 
-      bool nameMatches = fullName.contains(query.toLowerCase());
-
-      bool phoneNumberMatches = false;
-      for (final phone in contact.phones ?? []) {
-        if (phone.value != null && phone.value!.contains(query)) {
-          phoneNumberMatches = true;
-          break;
-        }
-      }
-
-      return nameMatches || phoneNumberMatches;
+      return fullName.contains(query.toLowerCase()) || phoneNumberMatches;
     }).toList();
 
     setState(() {
@@ -90,9 +82,7 @@ class _ContactListState extends State<ContactList> {
   void toggleSearch() {
     setState(() {
       isSearching = !isSearching;
-      if (!isSearching) {
-        resetContacts();
-      }
+      if (!isSearching) resetContacts();
     });
   }
 
@@ -161,100 +151,81 @@ class _ContactListState extends State<ContactList> {
         ],
       ),
       body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: Color.fromARGB(255, 144, 164, 174),
-              ),
-            )
-          : ListView.builder(
-              itemCount: _searchController.text.isEmpty
-                  ? contacts.length
-                  : searchResults.length,
-              itemBuilder: (context, index) {
-                final contact = _searchController.text.isEmpty
-                    ? contacts[index]
-                    : searchResults[index];
-                final phones = contact.phones;
-                return GestureDetector(
+    ? const Center(child: CircularProgressIndicator())
+    : contacts.isEmpty
+        ? const Center(child: Text('No contacts found'))
+        : ListView.builder(
+            itemCount: _searchController.text.isEmpty ? contacts.length : searchResults.length,
+            itemBuilder: (context, index) {
+              final contact = _searchController.text.isEmpty
+                  ? contacts[index]
+                  : searchResults[index];
+              return GestureDetector(
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (BuildContext context) {
-                          return AddNewContact(
-                            custName: contact.displayName.toString(),
-                            custPhn: phones![0].value.toString(),
-                          );
-                        },
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) => AddNewContact(
+                        custName: contact.displayName,
+                        custPhn: contact.phones.isNotEmpty
+                            ? contact.phones[0].number
+                            : '',
                       ),
-                    );
+                    ));
                   },
                   child: ListTile(
                     contentPadding: const EdgeInsets.only(left: 16, right: 8),
-                    leading: Container(
-                      height: 40,
-                      width: 40,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        color: Colors.blueGrey.shade300,
-                      ),
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.blueGrey[300],
                       child: Text(
-                        contact.givenName != null &&
-                                contact.givenName!.isNotEmpty
-                            ? contact.givenName![0].toUpperCase()
+                        contact.displayName.isNotEmpty
+                            ? contact.displayName[0].toUpperCase()
                             : '',
                         style: const TextStyle(
-                          fontSize: 25,
+                          fontSize: 20,
                           color: Colors.black,
-                          fontFamily: "Poppins",
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                     title: Text(
-                      contact.displayName ?? '',
+                      contact.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 15,
                         color: Colors.black,
-                        fontFamily: "Poppins",
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    subtitle: phones != null && phones.isNotEmpty
+                    subtitle: contact.phones.isNotEmpty
                         ? Text(
-                            phones[0].value ?? '',
+                            contact.phones[0].number,
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.blueGrey,
-                              fontFamily: "Poppins",
                               fontWeight: FontWeight.w400,
                             ),
                           )
                         : const SizedBox(),
-                    horizontalTitleGap: 14,
-                    trailing: IconButton(
-                      icon: const Icon(Icons.phone),
-                      onPressed: () => _makeCall(contact),
-                    ),
+                    // trailing: IconButton(
+                    //   icon: const Icon(Icons.phone),
+                    //   onPressed: () => _makeCall(contact),
+                    // ),
                   ),
                 );
-              },
-            ),
+            },
+          ),
+
     );
   }
-}
 
-// Function to make a call
-void _makeCall(Contact contact) async {
-  final phone = contact.phones?.firstWhere((phone) => phone.value != null);
-  if (phone != null) {
-    final url = 'tel:${phone.value}';
-    if (await canLaunch(url)) {
-      await launch(url);
-    } else {
-      throw 'Could not launch $url';
-    }
-  }
+  // void _makeCall(Contact contact) async {
+  //   if (contact.phones.isNotEmpty) {
+  //     final url = 'tel:${contact.phones[0].number}';
+  //     if (await canLaunch(url)) {
+  //       await launch(url);
+  //     } else {
+  //       throw 'Could not launch $url';
+  //     }
+  //   }
+  // }
 }

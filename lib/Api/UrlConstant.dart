@@ -17,4 +17,6 @@ class UrlConstant{
   static const String addInterest = '${baseUrl}addinterest.php';
   static const String addDeposite = '${baseUrl}adddeposite.php';
   static const String fetchInterestdetail = '${baseUrl}fetchInterestdetail.php';
+  static const String getCustomerLoanData = '${baseUrl}getCustomerLoanData.php';
+  static const String getLoanDetailForPDF = '${baseUrl}getLoanDetailForPDF.php';
 }
