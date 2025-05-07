@@ -5,11 +5,9 @@ import 'package:interest_book/DashboardScreen.dart';
 import 'package:interest_book/Loan/ApplyLoan.dart/ApplyLoan.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanList.dart';
 import 'package:interest_book/Model/CustomerModel.dart';
-import 'package:interest_book/Model/getLoanDetailForPDF.dart';
 import 'package:interest_book/pdfGenerator/generatePdfForPerticularCustomer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:provider/provider.dart';
 
 import '../../Api/RemoveCustomer.dart';
 

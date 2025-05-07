@@ -2,14 +2,12 @@ import 'package:interest_book/Model/getLoanDetailForPDF.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
-import 'package:intl/intl.dart';
 
 Future<void> generatePdfForPerticulatCustomer({
   required List<Getloandetailforpdf> data,
   required String customerName,
 }) async {
   final pdf = pw.Document();
-  final dateFormatter = DateFormat('dd MMM yyyy, hh:mm a');
 
   pdf.addPage(
     pw.Page(
@@ -18,30 +16,28 @@ Future<void> generatePdfForPerticulatCustomer({
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Row(
-              children: [
-                pw.Text(
-                  "Report is genrated at: ",
-                  style: pw.TextStyle(
-                    fontSize: 15,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.Text(
-                  DateTime.now().toString(),
-                  style: pw.TextStyle(
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
             pw.Text(
               'Customer Loan Interest Report',
               style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
             ),
             pw.Text(
               'Loan Report for: $customerName',
-              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+              style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Row(
+              children: [
+                pw.Text(
+                  "Report is genrated at: ",
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.Text(
+                  DateTime.now().toString(),
+                  style: pw.TextStyle(fontSize: 12),
+                ),
+              ],
             ),
             pw.SizedBox(height: 20),
             pw.Table.fromTextArray(
@@ -53,8 +49,13 @@ Future<void> generatePdfForPerticulatCustomer({
                 'Loan Note',
               ],
               cellAlignment: pw.Alignment.centerLeft,
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+              ),
+              headerDecoration: pw.BoxDecoration(
+                color: PdfColors.blueGrey300,
+              ),
               cellHeight: 30,
               data:
                   data.map((row) {
