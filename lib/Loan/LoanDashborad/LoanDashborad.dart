@@ -2,18 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:interest_book/Api/fetchAllLoansByUserAndCustomer.dart';
 import 'package:interest_book/Contact/EditContact.dart';
 import 'package:interest_book/DashboardScreen.dart';
-import 'package:interest_book/Loan/ApplyLoan.dart/ApplyLoan.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanList.dart';
-import 'package:interest_book/Model/CustomerModel.dart';
+import 'package:interest_book/Provider/CustomerProvider.dart';
 import 'package:interest_book/pdfGenerator/generatePdfForPerticularCustomer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:provider/provider.dart';
 import '../../Api/RemoveCustomer.dart';
 
 class Loandashboard extends StatefulWidget {
-  final Customer customer;
-  const Loandashboard({super.key, required this.customer});
+  final String custId;
+  const Loandashboard({super.key, required this.custId});
 
   @override
   State<Loandashboard> createState() => _LoandashboardState();
@@ -45,6 +44,16 @@ class _LoandashboardState extends State<Loandashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final customer = Provider.of<CustomerProvider>(
+      context,
+    ).getCustomerById(widget.custId);
+    if (customer == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text("Customer Not Found")),
+        body: Center(child: Text("Customer data not available.")),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -53,22 +62,22 @@ class _LoandashboardState extends State<Loandashboard> {
           },
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
-        title: Text(widget.customer.custName, overflow: TextOverflow.ellipsis),
+        title: Text(customer.custName, overflow: TextOverflow.ellipsis),
         backgroundColor: Colors.blueGrey[300],
         actions: [
           PopupMenuButton<String>(
-            onSelected: (value) {
+            onSelected: (value) async {
               if (value == 'call') {
-                _makePhoneCall(widget.customer.custPhn);
-                print('Calling ${widget.customer.custPhn}');
+                _makePhoneCall(customer.custPhn);
+                print('Calling ${customer.custPhn}');
               } else if (value == 'edit') {
-                Navigator.push(
+                final updated = await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder:
-                        (context) => EditContact(customer: widget.customer),
+                    builder: (context) => EditContact(customer: customer),
                   ),
                 );
+                if (updated == true) setState(() {});
               } else if (value == 'delete') {
                 showDialog(
                   context: context,
@@ -79,7 +88,7 @@ class _LoandashboardState extends State<Loandashboard> {
                         TextButton(
                           onPressed: () async {
                             await Removecustomer().remove(
-                              widget.customer.custId!,
+                              customer.custId!,
                               userId!,
                             );
                             Navigator.of(context).pushAndRemoveUntil(
@@ -104,22 +113,22 @@ class _LoandashboardState extends State<Loandashboard> {
               }
             },
             itemBuilder:
-                (BuildContext context) => <PopupMenuEntry<String>>[
-                  const PopupMenuItem<String>(
-                    value: 'call',
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
                     child: ListTile(
                       leading: Icon(Icons.call),
                       title: Text('Call'),
                     ),
                   ),
-                  const PopupMenuItem<String>(
-                    value: 'edit',
+                  const PopupMenuItem(
+                    value: 'call',
                     child: ListTile(
                       leading: Icon(Icons.edit),
                       title: Text('Edit'),
                     ),
                   ),
-                  const PopupMenuItem<String>(
+                  const PopupMenuItem(
                     value: 'delete',
                     child: ListTile(
                       leading: Icon(Icons.delete),
@@ -161,7 +170,7 @@ class _LoandashboardState extends State<Loandashboard> {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(
-                                widget.customer.custName,
+                                customer.custName,
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -180,12 +189,10 @@ class _LoandashboardState extends State<Loandashboard> {
                                         final data =
                                             await fetchAllLoansByUserAndCustomer(
                                               custId: int.parse(
-                                                widget.customer.custId
-                                                    .toString(),
+                                                customer.custId.toString(),
                                               ),
                                               userId: int.parse(
-                                                widget.customer.userId
-                                                    .toString(),
+                                                customer.userId.toString(),
                                               ),
                                             );
                                         print(
@@ -195,8 +202,7 @@ class _LoandashboardState extends State<Loandashboard> {
                                         print('Generating PDF...');
                                         await generatePdfForPerticulatCustomer(
                                           data: data,
-                                          customerName:
-                                              widget.customer.custName,
+                                          customerName: customer.custName,
                                         );
                                         print('PDF generated successfully');
                                       } catch (e, stacktrace) {
@@ -287,48 +293,9 @@ class _LoandashboardState extends State<Loandashboard> {
               ),
             ),
           ),
+
           Expanded(
-            child: LoanList(
-              custId: widget.customer.custId,
-              customer: widget.customer,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(
-              top: 20,
-              bottom: 20,
-              left: 20,
-              right: 20,
-            ),
-            child: GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) {
-                      return ApplyLoan(customerId: widget.customer.custId);
-                    },
-                  ),
-                );
-              },
-              child: Container(
-                height: 70,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.black, width: 2),
-                ),
-                child: const Center(
-                  child: Text(
-                    "Apply for a loan",
-                    style: TextStyle(
-                      color: Colors.blueGrey,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            child: LoanList(custId: customer.custId, customer: customer),
           ),
         ],
       ),

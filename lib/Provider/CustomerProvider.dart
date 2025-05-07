@@ -22,4 +22,20 @@ class CustomerProvider extends ChangeNotifier {
     _customers.add(customer);
     notifyListeners();
   }
+
+  void updateCustomer(Customer updated) {
+    final index = _customers.indexWhere((c) => c.custId == updated.custId);
+    if (index != -1) {
+      _customers[index] = updated;
+      notifyListeners();
+    }
+  }
+
+  Customer? getCustomerById(String custId) {
+    try {
+      return _customers.firstWhere((c) => c.custId == custId);
+    } catch (_) {
+      return null;
+    }
+  }
 }

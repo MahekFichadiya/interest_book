@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Contact/ContactList.dart';
 import 'package:interest_book/Home/CustomerList.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -10,99 +11,98 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final TextEditingController _searchController = TextEditingController();
+  bool _showSearchBar = true;
+  String? name;
+
+  final ScrollController _scrollController = ScrollController();
+
+  String _searchQuery = '';
+
+  loadName() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    setState(() {
+      name = prefs.getString("name") ?? '';
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadName();
+    _scrollController.addListener(() {
+      if (_scrollController.offset > 50 && _showSearchBar) {
+        setState(() => _showSearchBar = false);
+      } else if (_scrollController.offset <= 50 && !_showSearchBar) {
+        setState(() => _showSearchBar = true);
+      }
+    });
+
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final searchBarColor = Colors.blueGrey[300];
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.blueGrey[300],
-        title: const Text("Interest Book"),
+        backgroundColor: searchBarColor,
+        title: Text(name != null ? "Welcome, $name" : "Welcome, User"),
+        elevation: 0,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Container(
-          //   height: 150,
-          //   decoration: BoxDecoration(
-          //     color: Colors.blueGrey[200],
-          //   ),
-          //   child: Center(
-          //     child: Container(
-          //       height: 120,
-          //       width: 300,
-          //       decoration: const BoxDecoration(
-          //         color: Colors.white,
-          //       ),
-          //       child: const Column(
-          //         children: [
-          //           Row(
-          //             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          //             children: [
-          //               Column(
-          //                 children: [
-          //                   Text(
-          //                     "₹25000",
-          //                     style: TextStyle(
-          //                       fontSize: 20,
-          //                       fontWeight: FontWeight.bold,
-          //                       color: Colors.red,
-          //                     ),
-          //                   ),
-          //                   Text(
-          //                     "You gave ↓",
-          //                     style: TextStyle(
-          //                       fontSize: 12,
-          //                       fontWeight: FontWeight.bold,
-          //                       color: Colors.black,
-          //                     ),
-          //                   ),
-          //                 ],
-          //               ),
-          //               Column(
-          //                 children: [
-          //                   Text(
-          //                     "₹0",
-          //                     style: TextStyle(
-          //                       fontSize: 20,
-          //                       fontWeight: FontWeight.bold,
-          //                       color: Colors.green,
-          //                     ),
-          //                   ),
-          //                   Text(
-          //                     "You got ↑",
-          //                     style: TextStyle(
-          //                       fontSize: 12,
-          //                       fontWeight: FontWeight.bold,
-          //                       color: Colors.black,
-          //                     ),
-          //                   ),
-          //                 ],
-          //               ),
-          //             ],
-          //           ),
-          //           Divider(
-          //             height: 20,
-          //           ),
-          //           Text(
-          //             "Downlod the Report",
-          //             style: TextStyle(
-          //               fontSize: 20,
-          //               fontWeight: FontWeight.bold,
-          //               decoration: TextDecoration.underline,
-          //               decorationThickness: 2,
-          //             ),
-          //           ),
-          //         ],
-          //       ),
-          //     ),
-          //   ),
-          // ),
-          Expanded(child: CustomerList()),
+          Padding(
+            padding: EdgeInsets.only(top: _showSearchBar ? 60 : 0),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: CustomerList(
+                scrollController: _scrollController,
+                searchQuery: _searchQuery,
+              ),
+            ),
+          ),
+          if (_showSearchBar)
+            Container(
+              color: searchBarColor,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Material(
+                elevation: 2,
+                borderRadius: BorderRadius.circular(12),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: "Search customers...",
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (BuildContext context) => const ContactList(title: "Contact",),
+              builder: (context) => const ContactList(title: "Contact"),
             ),
           );
         },

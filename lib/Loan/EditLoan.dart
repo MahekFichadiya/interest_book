@@ -39,16 +39,19 @@ class _EditLoanState extends State<EditLoan> {
     custId = widget.customer.custId;
 
     if (widget.details.startDate.isNotEmpty) {
-      final DateTime parsedStartDate =
-          DateFormat("yyyy-MM-dd HH:mm:ss").parse(widget.details.startDate);
-      startDateController.text =
-          DateFormat("dd/MM/yyyy hh:mm a").format(parsedStartDate);
+      final DateTime parsedStartDate = DateFormat(
+        "yyyy-MM-dd HH:mm:ss",
+      ).parse(widget.details.startDate);
+      startDateController.text = DateFormat(
+        "dd/MM/yyyy hh:mm a",
+      ).format(parsedStartDate);
     }
 
     if (widget.details.endDate.isNotEmpty &&
         widget.details.endDate != '0000/00/00') {
-      final DateTime parsedEndDate =
-          DateFormat("yyyy-MM-dd").parse(widget.details.endDate);
+      final DateTime parsedEndDate = DateFormat(
+        "yyyy-MM-dd",
+      ).parse(widget.details.endDate);
       endDateController.text = DateFormat("dd/MM/yyyy").format(parsedEndDate);
     }
 
@@ -87,8 +90,9 @@ class _EditLoanState extends State<EditLoan> {
         now.minute,
       );
 
-      final String formattedDateTime =
-          DateFormat("dd/MM/yyyy hh:mm a").format(fullDateTime);
+      final String formattedDateTime = DateFormat(
+        "dd/MM/yyyy hh:mm a",
+      ).format(fullDateTime);
 
       setState(() {
         startDateController.text = formattedDateTime;
@@ -97,8 +101,9 @@ class _EditLoanState extends State<EditLoan> {
   }
 
   String getFormattedStartDateForMySQL(String dateTime) {
-    final DateTime parsedDateTime =
-        DateFormat("dd/MM/yyyy hh:mm a").parse(dateTime);
+    final DateTime parsedDateTime = DateFormat(
+      "dd/MM/yyyy hh:mm a",
+    ).parse(dateTime);
     return DateFormat("yyyy-MM-dd HH:mm:ss").format(parsedDateTime);
   }
 
@@ -145,20 +150,18 @@ class _EditLoanState extends State<EditLoan> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(25.0),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
       ),
-      builder: (context) => DraggableScrollableSheet(
-          initialChildSize: 0.28,
-          maxChildSize: 0.4,
-          minChildSize: 0.28,
-          expand: false,
-          builder: (context, scrollController) {
-            return SelectPhotoOptionsScreen(
-              onTap: _pickImage,
-            );
-          }),
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.28,
+            maxChildSize: 0.4,
+            minChildSize: 0.28,
+            expand: false,
+            builder: (context, scrollController) {
+              return SelectPhotoOptionsScreen(onTap: _pickImage);
+            },
+          ),
     );
   }
 
@@ -167,312 +170,239 @@ class _EditLoanState extends State<EditLoan> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text('Edit Loan'),
-        backgroundColor: Colors.blueGrey.shade300,
+        title: const Text('Edit Loan'),
+        backgroundColor: Colors.blueGrey.shade600,
         leading: IconButton(
           onPressed: () {
             showDialog(
               barrierDismissible: false,
               context: context,
-              builder: (context) => AlertDialog(
-                title: Text("Cancle update?"),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              Loandashboard(customer: widget.customer),
-                        ),
-                        (route) => false,
-                      );
-                    },
-                    child: Text("YES"),
+              builder:
+                  (context) => AlertDialog(
+                    title: const Text("Cancel update?"),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => Loandashboard(
+                                    custId: widget.customer.custId!,
+                                  ),
+                            ),
+                            (route) => false,
+                          );
+                        },
+                        child: const Text("YES"),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('NO'),
+                      ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: Text('NO'),
-                  ),
-                ],
-              ),
             );
           },
-          icon: Icon(Icons.arrow_back_ios_new_rounded),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
       ),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.all(8.0),
-          child: Column(
-            children: [
-              Form(
-                key: formKey,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: amountController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        label: Text("Amount"),
-                        prefixIcon: Icon(Icons.attach_money_rounded),
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          children: [
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTextField(
+                        amountController,
+                        "Amount",
+                        Icons.attach_money_rounded,
+                        TextInputType.number,
                       ),
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return "Field can't be empty";
-                        }
-                        final amount = double.tryParse(value);
-                        if (amount == null || amount <= 0) {
-                          return "Enter a valid positive number";
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: rateController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        label: Text("Rate"),
-                        prefixIcon: Icon(Icons.percent_rounded),
+                      _buildTextField(
+                        rateController,
+                        "Rate",
+                        Icons.percent_rounded,
+                        TextInputType.number,
                       ),
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return "Field can't be empty";
-                        }
-                        final rate = double.tryParse(value);
-                        if (rate == null || rate < 0 || rate > 100) {
-                          return "Enter a valid rate between 0 and 100";
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: startDateController,
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        hintText: "Opening Date",
-                        prefixIcon: Icon(Icons.calendar_month_outlined),
+                      _buildDateField(
+                        startDateController,
+                        "Opening Date",
+                        context,
+                        _selectStartDate,
                       ),
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return "Please select a start date";
-                        }
-                        return null;
-                      },
-                      onTap: () => _selectStartDate(context),
-                    ),
-                    TextFormField(
-                      controller: endDateController,
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        hintText: "Return Date (Optional)",
-                        prefixIcon: Icon(Icons.calendar_month_outlined),
+                      _buildDateField(
+                        endDateController,
+                        "Return Date (Optional)",
+                        context,
+                        _selectEndDate,
                       ),
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return null;
-                        }
-                        final startDate =
-                            DateTime.tryParse(startDateController.text);
-                        final endDate = DateTime.tryParse(value);
-                        if (startDate != null &&
-                            endDate != null &&
-                            endDate.isBefore(startDate)) {
-                          return "End date must be after start date";
-                        }
-                        return null;
-                      },
-                      onTap: () => _selectEndDate(context),
-                    ),
-                    TextFormField(
-                      readOnly: true,
-                      decoration: InputDecoration(
-                        hintText:
-                            _image == null ? "Select Image" : "Change Image",
-                        prefixIcon: const Icon(Icons.camera_alt_outlined),
+                      _buildImageSelector(),
+                      const SizedBox(height: 10),
+                      _buildImagePreview(),
+                      _buildTextField(
+                        noteController,
+                        "Note",
+                        Icons.event_note_outlined,
+                        TextInputType.text,
                       ),
-                      onTap: () {
-                        _showSelectPhotoOptions(context);
-                      },
-                      validator: (_) {
-                        if (_image == null && _localImage == null) {
-                          return "Please select an image";
-                        }
-                        return null;
-                      },
-                    ),
-                    // Column(
-                    //   children: [
-                    //     if (_image != null)
-                    //       Padding(
-                    //         padding: const EdgeInsets.only(
-                    //           top: 20,
-                    //           bottom: 10,
-                    //         ),
-                    //         child: Image.network(
-                    //           "${UrlConstant.baseUrl}${widget.details.image}",
-                    //           height: 300,
-                    //           width: 300,
-                    //         ),
-                    //         // child: Image.file(
-                    //         //   _image!,
-                    //         //   height: 200,
-                    //         //   width: 200,
-                    //         //   fit: BoxFit.cover,
-                    //         // ),
-                    //       )
-                    //     else
-                    //       Padding(
-                    //         padding: const EdgeInsets.only(
-                    //           top: 20,
-                    //           bottom: 10,
-                    //         ),
-                    //         child: Image.file(
-                    //           _image!,
-                    //           height: 300,
-                    //           width: 300,
-                    //         ),
-                    //       ),
-                    //   ],
-                    // ),
-                    Column(
-                      children: [
-                        // Display network image if available
-                        if (_image != null &&
-                            _localImage ==
-                                null) // Only show network image if no local image is selected
-                          Padding(
-                            padding: const EdgeInsets.only(top: 20, bottom: 10),
-                            child: Image.network(
-                              "${UrlConstant.showImage}/${widget.details.image}",
-                              height: 300,
-                              width: 300,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        // Display local image if selected
-                        else if (_localImage != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 20, bottom: 10),
-                            child: Image.file(
-                              _localImage!,
-                              height: 300,
-                              width: 300,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        // Placeholder if no image is available
-                        else
-                          Padding(
-                            padding: const EdgeInsets.only(top: 20, bottom: 10),
-                            child: Container(
-                              height: 300,
-                              width: 300,
-                              color: Colors.grey.shade300,
-                              child: Icon(
-                                Icons.image,
-                                size: 100,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    TextFormField(
-                      controller: noteController,
-                      keyboardType: TextInputType.text,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.event_note_outlined),
-                        label: Text("Note"),
-                      ),
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return "Field can't be empty";
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              GestureDetector(
-                onTap: () async {
-                  if (formKey.currentState!.validate()) {
-                    formKey.currentState!.save();
-                    print(widget.details.loanId);
-                    print(amountController.text);
-                    print(rateController.text);
-                    print(startDateController.text);
-                    print(endDateController.text);
-                    print(_image);
-                    print(noteController.text);
-                    print(userId);
-                    print(custId);
-
-                    // // Determine what to send for the image field
-                    // dynamic imageToSend;
-                    // if (_image != null) {
-                    //   // If a new image is selected, send the File
-                    //   imageToSend = _image;
-                    // } else {
-                    //   // If no new image is selected, send the current image URL as a String
-                    //   imageToSend = widget.details.image;
-                    // }
-
-                    var loan = await updateLoan(
-                      widget.details.loanId,
-                      amountController.text,
-                      rateController.text,
-                      startDateController.text,
-                      endDateController.text,
-                      _image, // Either a File or the existing image URL
-                      noteController.text,
-                      userId!,
-                      custId!,
-                    );
-                    formKey.currentState!.reset();
-                    amountController.clear();
-                    rateController.clear();
-                    startDateController.clear();
-                    endDateController.clear();
-                    noteController.clear();
-                    print(loan);
-                    if (loan) {
-                      print("loan granted");
-                      Navigator.pop(context);
-                    }
-                  } else {
-                    print("loan ungranted");
-                  }
-                },
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 20),
-                  child: Container(
-                    height: 70,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(25),
-                      border: Border.all(
-                        width: 2,
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Save',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueGrey,
-                        ),
-                      ),
+            ),
+            const SizedBox(height: 30),
+            GestureDetector(
+              onTap: _onSave,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey.shade600,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Save',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-              )
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon,
+    TextInputType keyboardType,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        validator: (value) {
+          if (value!.isEmpty) return "Field can't be empty";
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildDateField(
+    TextEditingController controller,
+    String hint,
+    BuildContext context,
+    Function(BuildContext) onTap,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: TextFormField(
+        controller: controller,
+        readOnly: true,
+        decoration: InputDecoration(
+          labelText: hint,
+          prefixIcon: const Icon(Icons.calendar_month_outlined),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        onTap: () => onTap(context),
+        validator: (value) => value!.isEmpty ? "Please select a date" : null,
+      ),
+    );
+  }
+
+  Widget _buildImageSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: TextFormField(
+        readOnly: true,
+        decoration: InputDecoration(
+          labelText: _image == null ? "Select Image" : "Change Image",
+          prefixIcon: const Icon(Icons.camera_alt_outlined),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        onTap: () => _showSelectPhotoOptions(context),
+        validator: (_) {
+          if (_image == null && _localImage == null) {
+            return "Please select an image";
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildImagePreview() {
+    if (_localImage != null) {
+      return Image.file(
+        _localImage!,
+        height: 250,
+        width: double.infinity,
+        fit: BoxFit.cover,
+      );
+    } else if (_image != null) {
+      return Image.network(
+        "${UrlConstant.showImage}/${widget.details.image}",
+        height: 250,
+        width: double.infinity,
+        fit: BoxFit.cover,
+      );
+    } else {
+      return Container(
+        height: 250,
+        width: double.infinity,
+        color: Colors.grey.shade200,
+        child: const Icon(Icons.image, size: 100, color: Colors.grey),
+      );
+    }
+  }
+
+  void _onSave() async {
+    if (formKey.currentState!.validate()) {
+      var loan = await updateLoan(
+        widget.details.loanId,
+        amountController.text,
+        rateController.text,
+        startDateController.text,
+        endDateController.text,
+        _localImage ?? _image,
+        noteController.text,
+        userId!,
+        custId!,
+      );
+      if (loan) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Loan updated successfully")),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Failed to update loan")));
+      }
+    }
   }
 }

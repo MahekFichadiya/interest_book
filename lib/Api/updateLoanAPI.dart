@@ -15,25 +15,36 @@ Future<bool> updateLoan(
   String custId,
 ) async {
   var url = Uri.parse(UrlConstant.updateLoan);
-  var request = http.MultipartRequest("POST", url)
-    ..fields['loanId'] = loanId
-    ..fields['amount'] = amount
-    ..fields['rate'] = rate
-    ..fields['startDate'] = startDate
-    ..fields['endDate'] = endDate
-    ..fields['note'] = note
-    ..fields['userId'] = userId
-    ..fields['custId'] = custId;
+  var request =
+      http.MultipartRequest("POST", url)
+        ..fields['loanId'] = loanId
+        ..fields['amount'] = amount
+        ..fields['rate'] = rate
+        ..fields['startDate'] = startDate
+        ..fields['endDate'] = endDate
+        ..fields['note'] = note
+        ..fields['userId'] = userId
+        ..fields['custId'] = custId;
 
-  if (image is File) {
-    // If the image is a File, send it as a multipart file
-    request.files.add(
-      await http.MultipartFile.fromPath("image", image.path),
-    );
-  } else if (image is String) {
-    // If the image is a URL (String), send it as a field
-    request.fields['image'] = image;
+  if (image is File && await image.exists()) {
+  // Send as a multipart file
+  request.files.add(
+    await http.MultipartFile.fromPath("image", image.path),
+  );
+  print("✅ Sending image as file: ${image.path}");
+} else {
+  print("🟡 Image type: ${image.runtimeType}");
+  print("🟡 Image value: $image");
+
+  if (image is String && image.trim().isNotEmpty) {
+    request.fields['image'] = image.trim();
+    print("✅ Sending image as string: ${image.trim()}");
+  } else {
+    request.fields['image'] = "";
+    print("❌ No valid image provided");
   }
+}
+
 
   var response = await request.send();
   print(response.statusCode);

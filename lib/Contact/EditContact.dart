@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:interest_book/Api/updateCustomer.dart';
 import 'package:interest_book/Model/CustomerModel.dart';
+import 'package:interest_book/Provider/CustomerProvider.dart';
+import 'package:provider/provider.dart';
 
 class EditContact extends StatefulWidget {
   final Customer? customer;
@@ -14,11 +17,15 @@ class _EditContactState extends State<EditContact> {
   TextEditingController namecontroller = TextEditingController();
   TextEditingController mobilenumbercontroller = TextEditingController();
   TextEditingController addresscontroller = TextEditingController();
+  String? date;
+  String? userId;
 
   loadData() {
     namecontroller.text = widget.customer!.custName;
     mobilenumbercontroller.text = widget.customer!.custPhn;
     addresscontroller.text = widget.customer!.custAddress!;
+    date = widget.customer!.date;
+    userId = widget.customer!.userId;
     setState(() {});
   }
 
@@ -35,7 +42,15 @@ class _EditContactState extends State<EditContact> {
         automaticallyImplyLeading: false,
         leading: IconButton(
           onPressed: () {
-            Navigator.pop(context);
+            Navigator.pop(
+              context,
+              Customer(
+                custName: namecontroller.text,
+                custPhn: mobilenumbercontroller.text,
+                date: date!,
+                userId: userId!,
+              ),
+            );
           },
           icon: Icon(Icons.arrow_back_ios_rounded),
         ),
@@ -103,13 +118,39 @@ class _EditContactState extends State<EditContact> {
               Padding(
                 padding: const EdgeInsets.only(top: 25),
                 child: GestureDetector(
-                  onTap: () {
-                    if(formKey.currentState!.validate()){
-                      formKey.currentState!.save();
-                      formKey.currentState!.reset();
-                          namecontroller.clear();
-                          mobilenumbercontroller.clear();
-                          addresscontroller.clear();
+                  onTap: () async {
+                    if (formKey.currentState!.validate()) {
+                      final updated = await updateCustomerApi().update(
+                        widget.customer!.custId.toString(),
+                        namecontroller.text,
+                        mobilenumbercontroller.text,
+                        addresscontroller.text,
+                      );
+
+                      if (updated) {
+                        final updatedCustomer = Customer(
+                          custId: widget.customer!.custId,
+                          custName: namecontroller.text,
+                          custPhn: mobilenumbercontroller.text,
+                          custAddress: addresscontroller.text,
+                          date: widget.customer!.date,
+                          userId: widget.customer!.userId,
+                        );
+
+                        Provider.of<CustomerProvider>(
+                          context,
+                          listen: false,
+                        ).updateCustomer(updatedCustomer);
+
+                        Navigator.pop(
+                          context,
+                          true,
+                        ); // ✅ Return true to refresh Loandashboard
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to update customer')),
+                        );
+                      }
                     }
                   },
                   child: Container(
@@ -117,17 +158,16 @@ class _EditContactState extends State<EditContact> {
                     decoration: BoxDecoration(
                       // color: Colors.white,
                       borderRadius: BorderRadius.circular(25),
-                      border: Border.all(
-                        width: 2,
-                      ),
+                      border: Border.all(width: 2),
                     ),
                     child: Center(
                       child: Text(
                         "SAVE",
                         style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueGrey),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey,
+                        ),
                       ),
                     ),
                   ),
