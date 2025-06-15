@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Provider/interestProvider.dart';
+import 'package:interest_book/Utils/amount_formatter.dart';
 import 'package:provider/provider.dart';
 
 class showInterest extends StatefulWidget {
@@ -75,7 +76,7 @@ class _showInterestState extends State<showInterest> {
                   child: Card(
                     child: ListTile(
                       title:
-                          Text(interestprovider.interest[index].interestAmount),
+                          Text(AmountFormatter.formatCurrencyWithDecimals(interestprovider.interest[index].interestAmount)),
                       subtitle:
                           Text(interestprovider.interest[index].interestDate),
                       trailing:

@@ -319,7 +319,7 @@ class _YouGotLoneState extends State<YouGotLone> {
                               );
                             }
 
-                            Navigator.pop(context);
+                            Navigator.pop(context, 'loan_added');
                           } catch (e) {
                             print("Error: $e");
                             ScaffoldMessenger.of(context).showSnackBar(

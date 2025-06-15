@@ -438,10 +438,22 @@ class _GetLoanDetailsState extends State<GetLoanDetails> {
                             height: 50,
                             width: 50,
                             errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
-                                Icons.broken_image,
-                                size: 50,
-                                color: Colors.red,
+                              // Show a placeholder with tooltip if image fails to load
+                              return Tooltip(
+                                message: "Image could not be loaded",
+                                child: Container(
+                                  height: 50,
+                                  width: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Icon(
+                                    Icons.broken_image,
+                                    size: 30,
+                                    color: Colors.grey,
+                                  ),
+                                ),
                               );
                             },
                           ),

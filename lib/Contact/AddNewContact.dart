@@ -189,12 +189,31 @@ class _AddNewContactState extends State<AddNewContact> {
                           custPhnController.clear();
                           custAddressController.clear();
                       if (customer) {
-                        print("Adding Cutomer...");
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Customer Added..."),
-                          ),
-                        );
+                        print("Adding Customer...");
+
+                        // Refresh the customer list to ensure the new customer appears
+                        await customerProvider.fetchCustomerList(userId!);
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Customer Added Successfully!"),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+
+                          // Navigate back to customer list
+                          Navigator.of(context).pop();
+                        }
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Failed to add customer. Please try again."),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
                       }
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(

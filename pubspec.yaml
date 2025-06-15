@@ -30,6 +30,7 @@ dev_dependencies:
   intl: ^0.18.0
   pdf: ^3.10.7
   printing: ^5.12.0
+  font_awesome_flutter: ^10.6.0
 
 flutter:
   uses-material-design: true

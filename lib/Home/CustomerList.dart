@@ -59,10 +59,22 @@ class _CustomerListState extends State<CustomerList> {
         }).toList();
 
         if (filtered.isEmpty) {
-          return const Center(
-            child: Text(
-              "No customer data available.",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+          return Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "No customer data available....",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                  ),
+                  Text(
+                    "Add a new Customer, by tapping on the '📞' button.",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           );
         }

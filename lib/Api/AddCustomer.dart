@@ -24,24 +24,44 @@ class Addcustomer {
     };
     final newbody = json.encode(body);
 
-    var responce = await http.post(Url, body: newbody);
+    var responce = await http.post(
+      Url,
+      body: newbody,
+      headers: {'Content-Type': 'application/json'},
+    );
+
     print(responce.body);
     print(responce.statusCode);
+
     if (responce.statusCode == 200 || responce.statusCode == 201) {
-      print(responce.statusCode);
-      // Add the customer to the provider's list
-      customerProvider.addCustomer(
-        Customer(
-          custName: custName,
-          custPhn: custPhn,
-          custAddress: custAddress,
-          date: date,
-          userId: userId,
-        ),
-      );
-      return true;
+      try {
+        var responseData = json.decode(responce.body);
+
+        if (responseData['status'] == true) {
+          var customerData = responseData['data'];
+
+          // Add the customer to the provider's list with the correct custId
+          customerProvider.addCustomer(
+            Customer(
+              custId: customerData['custId'].toString(),
+              custName: customerData['custName'],
+              custPhn: customerData['custPhn'],
+              custAddress: customerData['custAddress'],
+              date: customerData['date'],
+              userId: customerData['userId'].toString(),
+            ),
+          );
+          return true;
+        } else {
+          print("Error: ${responseData['message']}");
+          return false;
+        }
+      } catch (e) {
+        print("Error parsing response: $e");
+        return false;
+      }
     } else {
-      print(responce.statusCode);
+      print("HTTP Error: ${responce.statusCode}");
       return false;
     }
   }

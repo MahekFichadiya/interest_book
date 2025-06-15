@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Api/fetchAllLoansByUserAndCustomer.dart';
 import 'package:interest_book/Contact/EditContact.dart';
-import 'package:interest_book/DashboardScreen.dart';
+import 'package:interest_book/Loan/ApplyLoan/ApplyLoan.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanList.dart';
 import 'package:interest_book/Provider/CustomerProvider.dart';
+import 'package:interest_book/Provider/LoanProvider.dart';
 import 'package:interest_book/pdfGenerator/generatePdfForPerticularCustomer.dart';
+import 'package:interest_book/Utils/amount_formatter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
-import '../../Api/RemoveCustomer.dart';
 
 class Loandashboard extends StatefulWidget {
   final String custId;
@@ -42,35 +43,242 @@ class _LoandashboardState extends State<Loandashboard> {
     }
   }
 
+  // Remove this method as we'll use the provider's totals directly
+
+  void _showDeleteDialog(customer) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Customer'),
+            content: Text(
+              'Are you sure you want to delete ${customer.custName}? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  // Add delete functionality here
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Delete functionality - Coming Soon!'),
+                    ),
+                  );
+                },
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Icon(icon, color: color, size: 20),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(
+    String title,
+    String amount,
+    Color color,
+    IconData icon,
+  ) {
+    return Container(
+      width: 140, // Fixed width for horizontal scrolling
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.1)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 10),
+          Text(
+            amount,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _generatePDF(customer) async {
+    try {
+      final data = await fetchAllLoansByUserAndCustomer(
+        custId: int.parse(customer.custId.toString()),
+        userId: int.parse(customer.userId.toString()),
+      );
+
+      await generatePdfForPerticulatCustomer(
+        data: data,
+        customerName: customer.custName,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF generated successfully!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to generate PDF: $e')));
+      }
+    }
+  }
+
+  Future<void> _navigateToAddLoan(customer) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ApplyLoan(customerId: customer.custId),
+      ),
+    );
+
+    if (result == 'loan_added' && mounted) {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString("userId");
+      if (userId != null && mounted) {
+        Provider.of<LoanProvider>(
+          context,
+          listen: false,
+        ).fetchLoanDetailList(userId, widget.custId);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final customer = Provider.of<CustomerProvider>(
       context,
     ).getCustomerById(widget.custId);
+
     if (customer == null) {
       return Scaffold(
-        appBar: AppBar(title: Text("Customer Not Found")),
-        body: Center(child: Text("Customer data not available.")),
+        appBar: AppBar(
+          title: const Text("Customer Not Found"),
+          backgroundColor: Colors.blueGrey[700],
+          foregroundColor: Colors.white,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.person_off,
+                size: 80,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Customer not found",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Customer ID: ${widget.custId}",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  // Refresh customer list and try again
+                  final prefs = await SharedPreferences.getInstance();
+                  final userId = prefs.getString("userId");
+                  if (userId != null && mounted) {
+                    await Provider.of<CustomerProvider>(context, listen: false)
+                        .fetchCustomerList(userId);
+                    setState(() {}); // Trigger rebuild
+                  }
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text("Refresh"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueGrey[700],
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.blueGrey[700],
+        foregroundColor: Colors.white,
         leading: IconButton(
           onPressed: () {
             Navigator.pop(context, 'Success');
           },
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
-        title: Text(customer.custName, overflow: TextOverflow.ellipsis),
-        backgroundColor: Colors.blueGrey[300],
+        title: Text(
+          customer.custName,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
+          IconButton(
+            onPressed: () => _makePhoneCall(customer.custPhn),
+            icon: const Icon(Icons.phone),
+          ),
           PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
             onSelected: (value) async {
-              if (value == 'call') {
-                _makePhoneCall(customer.custPhn);
-                print('Calling ${customer.custPhn}');
-              } else if (value == 'edit') {
+              if (value == 'edit') {
                 final updated = await Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -79,37 +287,7 @@ class _LoandashboardState extends State<Loandashboard> {
                 );
                 if (updated == true) setState(() {});
               } else if (value == 'delete') {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: const Text("Do you want to delete the customer?"),
-                      actions: [
-                        TextButton(
-                          onPressed: () async {
-                            await Removecustomer().remove(
-                              customer.custId!,
-                              userId!,
-                            );
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (context) => DashboardScreen(),
-                              ),
-                              (route) => false,
-                            );
-                          },
-                          child: const Text('Yes'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Cancel'),
-                        ),
-                      ],
-                    );
-                  },
-                );
+                _showDeleteDialog(customer);
               }
             },
             itemBuilder:
@@ -117,22 +295,17 @@ class _LoandashboardState extends State<Loandashboard> {
                   const PopupMenuItem(
                     value: 'edit',
                     child: ListTile(
-                      leading: Icon(Icons.call),
-                      title: Text('Call'),
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'call',
-                    child: ListTile(
-                      leading: Icon(Icons.edit),
-                      title: Text('Edit'),
+                      leading: Icon(Icons.edit, color: Colors.blueGrey),
+                      title: Text('Edit Customer'),
+                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
                   const PopupMenuItem(
                     value: 'delete',
                     child: ListTile(
-                      leading: Icon(Icons.delete),
-                      title: Text('Delete'),
+                      leading: Icon(Icons.delete, color: Colors.red),
+                      title: Text('Delete Customer'),
+                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
                 ],
@@ -141,159 +314,164 @@ class _LoandashboardState extends State<Loandashboard> {
       ),
       body: Column(
         children: [
+          // Modern Customer Header Card
           Container(
-            height: 170,
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.blueGrey[200],
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(25),
-                bottomRight: Radius.circular(25),
-              ),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: Center(
-              child: Container(
-                height: 120,
-                width: 300,
-                decoration: const BoxDecoration(color: Colors.white),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
+              children: [
+                // Customer Info Row - Centered
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Container(
-                        height: 100,
-                        width: 150,
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                customer.custName,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const Divider(height: 2, color: Colors.black),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  IconButton(
-                                    onPressed: () async {
-                                      try {
-                                        print('Fetching data...');
-                                        final data =
-                                            await fetchAllLoansByUserAndCustomer(
-                                              custId: int.parse(
-                                                customer.custId.toString(),
-                                              ),
-                                              userId: int.parse(
-                                                customer.userId.toString(),
-                                              ),
-                                            );
-                                        print(
-                                          'Data fetched successfully: ${data.length} items',
-                                        );
-
-                                        print('Generating PDF...');
-                                        await generatePdfForPerticulatCustomer(
-                                          data: data,
-                                          customerName: customer.custName,
-                                        );
-                                        print('PDF generated successfully');
-                                      } catch (e, stacktrace) {
-                                        print(
-                                          'Error during PDF generation: $e',
-                                        );
-                                        print('Stacktrace: $stacktrace');
-
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Failed to generate report: $e',
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.picture_as_pdf),
-                                  ),
-
-                                  const Image(
-                                    image: AssetImage(
-                                      'assest/WhatsappIcon.png',
-                                    ),
-                                    height: 30,
-                                  ),
-                                  IconButton(
-                                    onPressed: () {},
-                                    icon: const Icon(Icons.message_rounded),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8, bottom: 8),
-                      child: VerticalDivider(width: 2, color: Colors.black),
-                    ),
+                    // Customer Avatar
                     Container(
-                      height: 100,
-                      width: 120,
-                      child: const Padding(
-                        padding: EdgeInsets.only(right: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            Text(
-                              "₹23,000",
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red,
-                              ),
-                            ),
-                            Text(
-                              "₹700",
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red,
-                              ),
-                            ),
-                            Divider(height: 2, color: Colors.red),
-                            Text(
-                              "₹23,700",
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red,
-                              ),
-                            ),
-                            Text(
-                              "They will pay you..",
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.blueGrey[100],
+                        borderRadius: BorderRadius.circular(30),
                       ),
+                      child: Icon(
+                        Icons.person,
+                        size: 30,
+                        color: Colors.blueGrey[600],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Customer Details
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          customer.custName,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          customer.custPhn,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
+
+                const SizedBox(height: 20),
+
+                // Action Buttons - Centered
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildActionButton(
+                      icon: Icons.picture_as_pdf,
+                      color: Colors.red,
+                      onTap: () => _generatePDF(customer),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildActionButton(
+                      icon: Icons.phone,
+                      color: Colors.green,
+                      onTap: () => _makePhoneCall(customer.custPhn),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildActionButton(
+                      icon: Icons.message,
+                      color: Colors.blue,
+                      onTap: () {
+                        // Message functionality
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // Financial Summary Cards - Real-time updates
+                Consumer<LoanProvider>(
+                  builder: (context, loanProvider, child) {
+                    final totals = loanProvider.totals;
+                    return SizedBox(
+                      height: 120, // Fixed height for the horizontal scroll view
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        children: [
+                          _buildSummaryCard(
+                            'Total Amount',
+                            AmountFormatter.formatCurrency(totals['totalAmount']),
+                            Colors.red,
+                            Icons.account_balance_wallet,
+                          ),
+                          _buildSummaryCard(
+                            'Interest',
+                            AmountFormatter.formatCurrency(totals['totalInterest']),
+                            Colors.orange,
+                            Icons.trending_up,
+                          ),
+                          _buildSummaryCard(
+                            'Total Due',
+                            AmountFormatter.formatCurrency(totals['totalDue']),
+                            Colors.blueGrey,
+                            Icons.payment,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
 
+          // Loans Section Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Loan List',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => _navigateToAddLoan(customer),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add Loan'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.blueGrey[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Loans List
           Expanded(
             child: LoanList(custId: customer.custId, customer: customer),
           ),

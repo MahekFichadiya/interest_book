@@ -95,7 +95,7 @@ class interestApi {
   }
 
   Future<List<Depositedetail>> getDepositeList(String loanId) async {
-    final url = Uri.parse("${UrlConstant.fetchInterestdetail}?loanId=$loanId");
+    final url = Uri.parse("${UrlConstant.fetchDepositedetail}?loanId=$loanId");
     final response = await http.get(url);
 
     List<Depositedetail> deposite = [];
@@ -112,5 +112,83 @@ class interestApi {
     }
     print(response.body);
     return deposite;
+  }
+
+  // Calculate monthly interest for a specific loan
+  Future<Map<String, dynamic>?> calculateMonthlyInterest(String loanId) async {
+    final url = Uri.parse(UrlConstant.calculateMonthlyInterest);
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: json.encode({"loanId": loanId}),
+    );
+
+    if (response.statusCode == 200) {
+      try {
+        return json.decode(response.body);
+      } catch (e) {
+        print("Error decoding JSON: $e");
+        return null;
+      }
+    }
+    return null;
+  }
+
+  // Trigger automatic interest calculation for all loans
+  Future<Map<String, dynamic>?> triggerAutomaticInterestCalculation() async {
+    final url = Uri.parse('${UrlConstant.baseUrl}automaticInterestCalculation.php');
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+    );
+
+    if (response.statusCode == 200) {
+      try {
+        return json.decode(response.body);
+      } catch (e) {
+        print("Error decoding JSON: $e");
+        return null;
+      }
+    }
+    return null;
+  }
+
+  // Update monthly interest for all active loans
+  Future<Map<String, dynamic>?> updateMonthlyInterest() async {
+    final url = Uri.parse(UrlConstant.updateMonthlyInterest);
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+    );
+
+    if (response.statusCode == 200) {
+      try {
+        return json.decode(response.body);
+      } catch (e) {
+        print("Error decoding JSON: $e");
+        return null;
+      }
+    }
+    return null;
+  }
+
+  // Calculate monthly interest for a specific loan
+  Future<Map<String, dynamic>?> calculateMonthlyInterestForLoan(String loanId) async {
+    final url = Uri.parse(UrlConstant.calculateMonthlyInterest);
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: json.encode({"loanId": loanId}),
+    );
+
+    if (response.statusCode == 200) {
+      try {
+        return json.decode(response.body);
+      } catch (e) {
+        print("Error decoding JSON: $e");
+        return null;
+      }
+    }
+    return null;
   }
 }

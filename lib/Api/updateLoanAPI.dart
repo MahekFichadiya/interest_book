@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:interest_book/Api/UrlConstant.dart';
+import 'package:intl/intl.dart';
 
 Future<bool> updateLoan(
   String loanId,
@@ -9,53 +10,49 @@ Future<bool> updateLoan(
   String rate,
   String startDate,
   String endDate,
-  dynamic image, // Accept both File and String
+  dynamic image,
   String note,
   String userId,
   String custId,
 ) async {
-  var url = Uri.parse(UrlConstant.updateLoan);
-  var request =
-      http.MultipartRequest("POST", url)
-        ..fields['loanId'] = loanId
-        ..fields['amount'] = amount
-        ..fields['rate'] = rate
-        ..fields['startDate'] = startDate
-        ..fields['endDate'] = endDate
-        ..fields['note'] = note
-        ..fields['userId'] = userId
-        ..fields['custId'] = custId;
-
-  if (image is File && await image.exists()) {
-  // Send as a multipart file
-  request.files.add(
-    await http.MultipartFile.fromPath("image", image.path),
-  );
-  print("✅ Sending image as file: ${image.path}");
-} else {
-  print("🟡 Image type: ${image.runtimeType}");
-  print("🟡 Image value: $image");
-
-  if (image is String && image.trim().isNotEmpty) {
-    request.fields['image'] = image.trim();
-    print("✅ Sending image as string: ${image.trim()}");
-  } else {
-    request.fields['image'] = "";
-    print("❌ No valid image provided");
-  }
-}
-
-
-  var response = await request.send();
-  print(response.statusCode);
-  if (response.statusCode == 200 || response.statusCode == 201) {
-    var data = await http.Response.fromStream(response);
-    var userData = jsonDecode(data.body);
-    print(userData);
-    return true;
-  } else {
-    var da = await http.Response.fromStream(response);
-    print("body" + da.body);
+  try {
+    var url = Uri.parse(UrlConstant.updateLoan);
+    var request = http.MultipartRequest("POST", url);
+    
+    // Convert dates to MySQL format
+    final DateTime startDateTime = DateFormat("dd/MM/yyyy hh:mm a").parse(startDate);
+    final String formattedStartDate = DateFormat("yyyy-MM-dd HH:mm:ss").format(startDateTime);
+    
+    String formattedEndDate = "";
+    if (endDate.isNotEmpty) {
+      final DateTime endDateTime = DateFormat("dd/MM/yyyy").parse(endDate);
+      formattedEndDate = DateFormat("yyyy-MM-dd").format(endDateTime);
+    }
+    
+    // Add form fields
+    request.fields['loanId'] = loanId;
+    request.fields['amount'] = amount;
+    request.fields['rate'] = rate;
+    request.fields['startDate'] = formattedStartDate;
+    request.fields['endDate'] = formattedEndDate;
+    request.fields['note'] = note;
+    request.fields['userId'] = userId;
+    request.fields['custId'] = custId;
+    
+    // Handle image upload - only send if a new image is selected
+    if (image != null && image is File && await image.exists()) {
+      request.files.add(
+        await http.MultipartFile.fromPath("image", image.path),
+      );
+    }
+    
+    var response = await request.send();
+    var responseData = await response.stream.bytesToString();
+    var jsonData = json.decode(responseData);
+    
+    return jsonData['status'] == 'true';
+  } catch (e) {
+    print("Error updating loan: $e");
     return false;
   }
 }

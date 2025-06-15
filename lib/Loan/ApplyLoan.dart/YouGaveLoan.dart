@@ -335,7 +335,7 @@ class _YouGaveLoneState extends State<YouGaveLone> {
 
                             // ✅ THIS IS THE KEY PART:
                             Navigator.pop(
-                                context, true); // tell LoanList to refresh
+                                context, 'loan_added'); // tell LoanDashboard to refresh
                           } catch (e) {
                             print("Error: $e");
                             ScaffoldMessenger.of(context).showSnackBar(
