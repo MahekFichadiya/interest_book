@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:interest_book/Api/ShowCustomer.dart';
+import 'package:interest_book/Api/show_customer.dart';
 import 'package:interest_book/Model/CustomerModel.dart';
 
 class CustomerProvider extends ChangeNotifier {

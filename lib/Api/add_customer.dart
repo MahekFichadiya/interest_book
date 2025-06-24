@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:interest_book/Api/UrlConstant.dart';
+import 'package:interest_book/Provider/customer_provider.dart';
 
 import '../Model/CustomerModel.dart';
-import '../Provider/CustomerProvider.dart';
 
 class Addcustomer {
   Future<bool> add(

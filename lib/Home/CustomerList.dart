@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanDashborad.dart';
-import 'package:interest_book/Provider/CustomerProvider.dart';
+import 'package:interest_book/Provider/customer_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';

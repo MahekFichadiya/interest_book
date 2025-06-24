@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanDetail.dart';
+import 'package:interest_book/Provider/loan_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../Model/CustomerModel.dart';
 import 'package:provider/provider.dart';
-import '../../Provider/LoanProvider.dart';
 
 class LoanList extends StatefulWidget {
   final String? custId;
@@ -34,8 +34,17 @@ class _LoanListState extends State<LoanList> {
   }
 
   Future<void> fetchLoanDetailList() async {
-    await Provider.of<LoanProvider>(context, listen: false)
-        .fetchLoanDetailList(userId, widget.customer.custId);
+    try {
+      // Use simple fetch for faster navigation, fallback to full fetch if needed
+      await Provider.of<LoanProvider>(context, listen: false)
+          .fetchLoanDetailListSimple(userId, widget.customer.custId);
+    } catch (e) {
+      // If simple fetch fails, try full fetch with interest calculations
+      if (mounted) {
+        await Provider.of<LoanProvider>(context, listen: false)
+            .fetchLoanDetailList(userId, widget.customer.custId);
+      }
+    }
   }
 
   @override
@@ -50,7 +59,7 @@ class _LoanListState extends State<LoanList> {
           } else if (loanProvider.detail.isEmpty) {
             return const Center(
               child: Text(
-                "No Loan on this Customer :)",
+                "This customer has no loan :)",
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
               ),
             );

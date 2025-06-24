@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:interest_book/Provider/deposite_provider.dart';
+import 'package:interest_book/Provider/loan_provider.dart';
+import 'package:interest_book/Provider/profile_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 import '../../Api/interest.dart';
-import '../../Provider/depositeProvider.dart';
-import '../../Provider/LoanProvider.dart';
 import '../../Widgets/amount_form_field.dart';
 
 class AddDepositScreen extends StatefulWidget {
@@ -28,8 +30,8 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
   @override
   void initState() {
     super.initState();
-    // Set current date as default
-    _dateController.text = DateTime.now().toString().split(' ')[0];
+    // Set current date as default in dd/MM/yyyy format
+    _dateController.text = DateFormat("dd/MM/yyyy").format(DateTime.now());
   }
 
   @override
@@ -38,6 +40,44 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
     _dateController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  void _showSnackBar(String message, {bool isError = false, bool showRetry = false}) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error : Icons.check_circle,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: Duration(seconds: isError ? 4 : 3),
+        behavior: SnackBarBehavior.floating,
+        action: showRetry ? SnackBarAction(
+          label: 'Retry',
+          textColor: Colors.white,
+          onPressed: () {
+            if (!_isLoading) {
+              _saveDeposit();
+            }
+          },
+        ) : null,
+      ),
+    );
+  }
+
+  // Convert display format (dd/MM/yyyy) to MySQL format (yyyy-MM-dd)
+  String getFormattedDateForMySQL(String dateTime) {
+    final DateTime parsedDateTime = DateFormat("dd/MM/yyyy").parse(dateTime);
+    return DateFormat("yyyy-MM-dd").format(parsedDateTime);
   }
 
   Future<void> _selectDate() async {
@@ -63,7 +103,7 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
 
     if (picked != null) {
       setState(() {
-        _dateController.text = picked.toString().split(' ')[0];
+        _dateController.text = DateFormat("dd/MM/yyyy").format(picked);
       });
     }
   }
@@ -77,59 +117,65 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
       // Get raw amount value for API
       String rawAmount = AmountFormFieldHelper.getRawAmount(_amountController);
 
+      // Convert date from display format (dd/MM/yyyy) to MySQL format (yyyy-MM-dd)
+      String formattedDate = getFormattedDateForMySQL(_dateController.text);
+
       final success = await interestApi().addDeposite(
         rawAmount,
-        _dateController.text,
+        formattedDate,
         _noteController.text,
         widget.loanId,
       );
 
       if (success) {
-        // Refresh the deposit list
+        // Immediately notify UI of changes for instant update
+        if (mounted) {
+          Provider.of<Depositeprovider>(context, listen: false).forceRefresh();
+        }
+
+        // Refresh the deposit list in background
         if (mounted) {
           await Provider.of<Depositeprovider>(context, listen: false)
               .fetchDepositeList(widget.loanId);
         }
 
-        // Refresh loan data to update totals immediately
-        if (mounted) {
-          final prefs = await SharedPreferences.getInstance();
-          final userId = prefs.getString("userId");
-          final custId = prefs.getString("custId"); // You might need to pass this as parameter
+        // Refresh loan data to update totals
+        final prefs = await SharedPreferences.getInstance();
+        final userId = prefs.getString("userId");
+        final custId = prefs.getString("custId");
 
-          if (userId != null) {
-            await Provider.of<LoanProvider>(context, listen: false)
-                .fetchLoanDetailList(userId, custId);
+        if (mounted && userId != null) {
+          await Provider.of<LoanProvider>(context, listen: false)
+              .fetchLoanDetailList(userId, custId);
+
+          // Also refresh the profile provider to update profile screen amounts
+          if (mounted) {
+            await Provider.of<ProfileProvider>(context, listen: false)
+                .fetchMoneyInfo();
           }
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Deposit added successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showSnackBar('Deposit added successfully');
           Navigator.pop(context, true);
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to add deposit'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showSnackBar('Failed to add deposit. Please try again.', isError: true, showRetry: true);
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        String errorMessage = 'An unexpected error occurred';
+        if (e.toString().contains('network') || e.toString().contains('connection')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (e.toString().contains('timeout')) {
+          errorMessage = 'Request timeout. Please try again.';
+        } else if (e.toString().contains('server')) {
+          errorMessage = 'Server error. Please try again later.';
+        }
+
+        _showSnackBar(errorMessage, isError: true, showRetry: true);
       }
     } finally {
       if (mounted) {

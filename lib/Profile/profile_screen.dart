@@ -109,19 +109,31 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Api/UrlConstant.dart';
 import 'package:interest_book/Model/customerLoanData.dart';
-import 'package:interest_book/Profile/UpdateProfile.dart';
-import 'package:interest_book/Provider/ProfileProvider.dart';
-import 'package:interest_book/pdfGenerator/generatePdfWholeCustomerList.dart';
-import 'package:interest_book/settledLoan/settledLoanList.dart';
+import 'package:interest_book/Profile/update_profile.dart';
+import 'package:interest_book/Provider/profile_provider.dart';
+import 'package:interest_book/pdfGenerator/generate_pdf_whole_customer_list.dart';
+import 'package:interest_book/settledLoan/list_of_settled_customer.dart';
+import 'package:interest_book/settledLoan/settled_loan_list.dart';
+import 'package:interest_book/Utils/amount_formatter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Login&Signup/LoginScreen.dart';
-import '../settledLoan/ListOfSettledCustomer.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Money info will be automatically fetched when profile is loaded
+  }
 
   Future<List<Customerloandata>> fetchCustomerLoanData() async {
     final response = await http.get(
@@ -288,20 +300,70 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const ListTile(
-                title: Text("You gave ↓"),
-                trailing: Text(
-                  "₹2000",
-                  style: TextStyle(fontSize: 15, color: Colors.green),
-                ),
+              Consumer<ProfileProvider>(
+                builder: (context, profileProvider, child) {
+                  if (profileProvider.isLoadingMoneyInfo) {
+                    return const ListTile(
+                      title: Text("You gave ↓"),
+                      trailing: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  }
+
+                  if (profileProvider.moneyInfoError.isNotEmpty) {
+                    return const ListTile(
+                      title: Text("You gave ↓"),
+                      trailing: Text(
+                        "Error loading data",
+                        style: TextStyle(fontSize: 12, color: Colors.red),
+                      ),
+                    );
+                  }
+
+                  return ListTile(
+                    title: const Text("You gave ↓"),
+                    trailing: Text(
+                      AmountFormatter.formatCurrency(profileProvider.youGave),
+                      style: const TextStyle(fontSize: 15, color: Colors.green),
+                    ),
+                  );
+                },
               ),
               const Divider(height: 1, thickness: 2),
-              const ListTile(
-                title: Text("You got ↑"),
-                trailing: Text(
-                  "₹25000",
-                  style: TextStyle(fontSize: 15, color: Colors.red),
-                ),
+              Consumer<ProfileProvider>(
+                builder: (context, profileProvider, child) {
+                  if (profileProvider.isLoadingMoneyInfo) {
+                    return const ListTile(
+                      title: Text("You got ↑"),
+                      trailing: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  }
+
+                  if (profileProvider.moneyInfoError.isNotEmpty) {
+                    return const ListTile(
+                      title: Text("You got ↑"),
+                      trailing: Text(
+                        "Error loading data",
+                        style: TextStyle(fontSize: 12, color: Colors.red),
+                      ),
+                    );
+                  }
+
+                  return ListTile(
+                    title: const Text("You got ↑"),
+                    trailing: Text(
+                      AmountFormatter.formatCurrency(profileProvider.youGot),
+                      style: const TextStyle(fontSize: 15, color: Colors.red),
+                    ),
+                  );
+                },
               ),
               const Divider(height: 1, thickness: 2),
               Padding(
@@ -309,12 +371,51 @@ class ProfileScreen extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () async {
                     try {
-                      final data = await fetchCustomerLoanData();
-                      await generatePdfFromData(data);
-                    } catch (e) {
+                      // Show loading indicator
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Failed to generate report: $e")),
+                        const SnackBar(
+                          content: Text('Generating business report...'),
+                          backgroundColor: Colors.blue,
+                          duration: Duration(seconds: 2),
+                        ),
                       );
+
+                      // Get profile data
+                      final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+
+                      // Fetch customer loan data
+                      final data = await fetchCustomerLoanData();
+
+                      // Generate PDF with enhanced data
+                      await generatePdfFromData(
+                        data,
+                        userName: profileProvider.name.isNotEmpty ? profileProvider.name : null,
+                        userEmail: profileProvider.email.isNotEmpty ? profileProvider.email : null,
+                        userPhone: profileProvider.mobileNo.isNotEmpty ? profileProvider.mobileNo : null,
+                        totalYouGave: profileProvider.youGave,
+                        totalYouGot: profileProvider.youGot,
+                      );
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Business report generated successfully!'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      print('Profile PDF generation error: $e');
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Failed to generate report: ${e.toString()}"),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 5),
+                          ),
+                        );
+                      }
                     }
                   },
                   child: Container(

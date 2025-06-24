@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../Model/CustomerModel.dart';
 import '../../Model/LoanDetail.dart';
 import '../../Utils/amount_formatter.dart';
+import '../../Widgets/interest_amount_display.dart';
 import '../EntryDetails/entry_details_screen.dart';
 
 class LoanDetail extends StatefulWidget {
@@ -393,15 +394,11 @@ class LoanDetailState extends State<LoanDetail> {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              AmountFormatter.formatCurrencyWithDecimals(totalInterest),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.orange.shade800,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            InterestAmountDisplay(
+                              totalInterest: totalInterest,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              showIcon: true,
                             ),
                             const SizedBox(height: 4),
                             Text(

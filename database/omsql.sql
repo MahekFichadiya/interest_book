@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 11, 2025 at 01:38 PM
+-- Generation Time: Jun 16, 2025 at 10:43 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -104,6 +104,127 @@ INSERT INTO `deposite` (`depositeId`, `depositeAmount`, `depositeDate`, `deposit
 (12, 200, '2025-04-14', 'mital', 63),
 (13, 200, '2025-04-14', 'dnrkgksk', 63),
 (14, 200, '2025-04-14', 'hii', 63);
+
+--
+-- Triggers `deposite`
+--
+DELIMITER $$
+CREATE TRIGGER `update_loan_after_deposit_delete` AFTER DELETE ON `deposite` FOR EACH ROW BEGIN
+    DECLARE total_deposits DECIMAL(10,2);
+    DECLARE loan_amount DECIMAL(10,2);
+    DECLARE loan_rate DECIMAL(5,2);
+    DECLARE new_updated_amount DECIMAL(10,2);
+    DECLARE new_monthly_interest DECIMAL(10,2);
+    DECLARE new_daily_interest DECIMAL(10,2);
+    
+    -- Get current loan details
+    SELECT amount, rate INTO loan_amount, loan_rate
+    FROM loan 
+    WHERE loanId = OLD.loanid;
+    
+    -- Calculate total deposits for this loan (after deletion)
+    SELECT COALESCE(SUM(depositeAmount), 0) INTO total_deposits
+    FROM deposite 
+    WHERE loanid = OLD.loanid;
+    
+    -- Calculate new updated amount (remaining balance)
+    SET new_updated_amount = GREATEST(0, loan_amount - total_deposits);
+    
+    -- Calculate new monthly interest on remaining balance
+    SET new_monthly_interest = ROUND((new_updated_amount * loan_rate) / 100, 2);
+    
+    -- Calculate new daily interest
+    SET new_daily_interest = ROUND(new_monthly_interest / 30, 2);
+    
+    -- Update loan table with all calculated values
+    UPDATE loan 
+    SET 
+        totalDeposite = total_deposits,
+        updatedAmount = new_updated_amount,
+        interest = new_monthly_interest,
+        dailyInterest = new_daily_interest
+    WHERE loanId = OLD.loanid;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `update_loan_after_deposit_insert` AFTER INSERT ON `deposite` FOR EACH ROW BEGIN
+    DECLARE total_deposits DECIMAL(10,2);
+    DECLARE loan_amount DECIMAL(10,2);
+    DECLARE loan_rate DECIMAL(5,2);
+    DECLARE new_updated_amount DECIMAL(10,2);
+    DECLARE new_monthly_interest DECIMAL(10,2);
+    DECLARE new_daily_interest DECIMAL(10,2);
+    
+    -- Get current loan details
+    SELECT amount, rate INTO loan_amount, loan_rate
+    FROM loan 
+    WHERE loanId = NEW.loanid;
+    
+    -- Calculate total deposits for this loan
+    SELECT COALESCE(SUM(depositeAmount), 0) INTO total_deposits
+    FROM deposite 
+    WHERE loanid = NEW.loanid;
+    
+    -- Calculate new updated amount (remaining balance)
+    SET new_updated_amount = GREATEST(0, loan_amount - total_deposits);
+    
+    -- Calculate new monthly interest on remaining balance
+    SET new_monthly_interest = ROUND((new_updated_amount * loan_rate) / 100, 2);
+    
+    -- Calculate new daily interest
+    SET new_daily_interest = ROUND(new_monthly_interest / 30, 2);
+    
+    -- Update loan table with all calculated values
+    UPDATE loan 
+    SET 
+        totalDeposite = total_deposits,
+        updatedAmount = new_updated_amount,
+        interest = new_monthly_interest,
+        dailyInterest = new_daily_interest
+    WHERE loanId = NEW.loanid;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `update_loan_after_deposit_update` AFTER UPDATE ON `deposite` FOR EACH ROW BEGIN
+    DECLARE total_deposits DECIMAL(10,2);
+    DECLARE loan_amount DECIMAL(10,2);
+    DECLARE loan_rate DECIMAL(5,2);
+    DECLARE new_updated_amount DECIMAL(10,2);
+    DECLARE new_monthly_interest DECIMAL(10,2);
+    DECLARE new_daily_interest DECIMAL(10,2);
+    
+    -- Get current loan details
+    SELECT amount, rate INTO loan_amount, loan_rate
+    FROM loan 
+    WHERE loanId = NEW.loanid;
+    
+    -- Calculate total deposits for this loan
+    SELECT COALESCE(SUM(depositeAmount), 0) INTO total_deposits
+    FROM deposite 
+    WHERE loanid = NEW.loanid;
+    
+    -- Calculate new updated amount (remaining balance)
+    SET new_updated_amount = GREATEST(0, loan_amount - total_deposits);
+    
+    -- Calculate new monthly interest on remaining balance
+    SET new_monthly_interest = ROUND((new_updated_amount * loan_rate) / 100, 2);
+    
+    -- Calculate new daily interest
+    SET new_daily_interest = ROUND(new_monthly_interest / 30, 2);
+    
+    -- Update loan table with all calculated values
+    UPDATE loan 
+    SET 
+        totalDeposite = total_deposits,
+        updatedAmount = new_updated_amount,
+        interest = new_monthly_interest,
+        dailyInterest = new_daily_interest
+    WHERE loanId = NEW.loanid;
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -265,17 +386,21 @@ CREATE TABLE `loan` (
   `custId` int(5) NOT NULL,
   `interest` decimal(10,2) NOT NULL DEFAULT 0.00,
   `totalInterest` decimal(10,2) NOT NULL,
-  `lastInterestUpdatedAt` date DEFAULT NULL
+  `lastInterestUpdatedAt` date DEFAULT NULL,
+  `dailyInterest` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Daily interest amount calculated from monthly interest'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `loan`
 --
 
-INSERT INTO `loan` (`loanId`, `amount`, `rate`, `startDate`, `endDate`, `image`, `note`, `updatedAmount`, `totalDeposite`, `type`, `userId`, `custId`, `interest`, `totalInterest`, `lastInterestUpdatedAt`) VALUES
-(63, 80000, 1.5, '2030-11-01 12:00:00', '2030-11-01', 'OmjavellersHtml/LoanImages/Snapchat-226898991.jpg', 'hiring poster', 70000, 0, 1, 10, 9, 0.00, 0.00, NULL),
-(64, 8000, 1, '2025-01-01 23:12:00', '2025-01-01', 'OmJavellerssHTML/LoanImages/Welcome To.png', 'hello', 8000, 0, 1, 10, 9, 0.00, 0.00, NULL),
-(65, 5000, 1, '2025-03-02 18:46:00', '2025-03-02', 'OmJavellerssHTML/LoanImages/IMG-20250409-WA0009.jpg', 'demo', 5000, 0, 1, 10, 9, 0.00, 0.00, NULL);
+INSERT INTO `loan` (`loanId`, `amount`, `rate`, `startDate`, `endDate`, `image`, `note`, `updatedAmount`, `totalDeposite`, `type`, `userId`, `custId`, `interest`, `totalInterest`, `lastInterestUpdatedAt`, `dailyInterest`) VALUES
+(63, 80000, 1.5, '2030-11-01 12:00:00', '2030-11-01', 'OmjavellersHtml/LoanImages/Snapchat-226898991.jpg', 'hiring poster', 70000, 0, 1, 10, 9, 1050.00, 73500.00, '2025-06-16', 35.00),
+(64, 8000, 1, '2025-04-01 23:12:00', '2025-01-01', 'OmJavellerssHTML/LoanImages/Welcome To.png', 'hello', 8000, 0, 1, 10, 9, 80.00, 880.00, '2025-06-16', 2.67),
+(65, 5000, 1, '2025-05-02 18:46:00', '2025-03-02', 'OmJavellerssHTML/LoanImages/IMG-20250409-WA0009.jpg', 'demo', 5000, 0, 1, 10, 9, 50.00, 450.00, '2025-06-16', 1.67),
+(67, 5000, 2, '2025-06-16 13:34:00', '0000-00-00', 'OmJavellerssHTML/LoanImages/2df2ed38-29d3-4baf-914b-3be928cec8692643132718976339287.jpg', 'demo current interest ', 5000, 0, 1, 10, 23, 100.00, 600.00, '2025-06-16', 3.33),
+(68, 5000, 2, '2025-05-16 13:36:00', '0000-00-00', 'OmJavellerssHTML/LoanImages/88c3643d-9cba-4367-9ce5-14585257ec306549513797301108875.jpg', '1 month', 5000, 0, 1, 10, 23, 100.00, 700.00, '2025-06-16', 3.33),
+(69, 5000, 2, '2025-04-16 13:36:00', '0000-00-00', 'OmJavellerssHTML/LoanImages/5731dcb8-daa2-4cf4-9d51-341a763cfb396226656519422982429.jpg', 'demo', 5000, 0, 1, 10, 23, 100.00, 1000.00, '2025-06-16', 3.33);
 
 --
 -- Triggers `loan`
@@ -284,6 +409,84 @@ DELIMITER $$
 CREATE TRIGGER `backupedLoan` AFTER DELETE ON `loan` FOR EACH ROW BEGIN
     INSERT INTO historyloan (loanId, amount, rate, startDate, endDate, image, note, updatedAmount, type, userId, custId)
     VALUES (OLD.loanId, OLD.amount, OLD.rate, OLD.startDate, OLD.endDate, OLD.image, OLD.note, OLD.updatedAmount, OLD.type, OLD.userId, OLD.custId);
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `calculate_interest_on_loan_insert` BEFORE INSERT ON `loan` FOR EACH ROW BEGIN
+    DECLARE days_passed INT;
+    DECLARE months_passed INT;
+    DECLARE monthly_interest DECIMAL(10,2);
+    DECLARE daily_interest DECIMAL(10,2);
+    DECLARE total_interest_to_add DECIMAL(10,2);
+
+    -- Calculate monthly interest: (updatedAmount * rate) / 100
+    SET monthly_interest = ROUND((NEW.updatedAmount * NEW.rate) / 100, 2);
+    
+    -- Calculate daily interest: monthly interest / 30
+    SET daily_interest = ROUND(monthly_interest / 30, 2);
+    
+    -- Set the interest fields
+    SET NEW.interest = monthly_interest;
+    SET NEW.dailyInterest = daily_interest;
+    
+    -- Calculate days passed since start date
+    SET days_passed = DATEDIFF(CURDATE(), DATE(NEW.startDate));
+
+    -- Only calculate totalInterest if more than 1 day has passed
+    IF days_passed > 1 THEN
+        -- Calculate months passed (for totalInterest calculation)
+        SET months_passed = TIMESTAMPDIFF(MONTH, NEW.startDate, NOW());
+
+        -- If at least 1 month has passed, calculate totalInterest
+        IF months_passed >= 1 THEN
+            SET total_interest_to_add = monthly_interest * months_passed;
+            SET NEW.totalInterest = total_interest_to_add;
+            SET NEW.lastInterestUpdatedAt = CURDATE();
+        ELSE
+            -- If less than 1 month but more than 1 day, set totalInterest to 0
+            SET NEW.totalInterest = 0.00;
+            SET NEW.lastInterestUpdatedAt = CURDATE();
+        END IF;
+    ELSE
+        -- If 1 day or less has passed, set totalInterest to 0
+        SET NEW.totalInterest = 0.00;
+    END IF;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `calculate_totalinterest_on_loan_insert` BEFORE INSERT ON `loan` FOR EACH ROW BEGIN
+    DECLARE days_passed INT;
+    DECLARE months_passed INT;
+    DECLARE monthly_interest DECIMAL(10,2);
+    DECLARE total_interest_to_add DECIMAL(10,2);
+
+    -- Calculate days passed since start date
+    SET days_passed = DATEDIFF(CURDATE(), DATE(NEW.startDate));
+
+    -- Only proceed if more than 1 day has passed
+    IF days_passed > 1 THEN
+        -- Calculate monthly interest amount
+        SET monthly_interest = ROUND((NEW.updatedAmount * NEW.rate) / 100, 2);
+
+        -- Calculate months passed (for totalInterest calculation)
+        SET months_passed = TIMESTAMPDIFF(MONTH, NEW.startDate, NOW());
+
+        -- If at least 1 month has passed, calculate totalInterest
+        IF months_passed >= 1 THEN
+            SET total_interest_to_add = monthly_interest * months_passed;
+
+            -- Set the values directly in the NEW record
+            SET NEW.interest = monthly_interest;
+            SET NEW.totalInterest = total_interest_to_add;
+            SET NEW.lastInterestUpdatedAt = CURDATE();
+        ELSE
+            -- If less than 1 month but more than 1 day, just set the monthly interest
+            SET NEW.interest = monthly_interest;
+            SET NEW.lastInterestUpdatedAt = CURDATE();
+        END IF;
+    END IF;
 END
 $$
 DELIMITER ;
@@ -395,7 +598,7 @@ ALTER TABLE `interest`
 -- AUTO_INCREMENT for table `loan`
 --
 ALTER TABLE `loan`
-  MODIFY `loanId` int(5) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=67;
+  MODIFY `loanId` int(5) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=70;
 
 --
 -- AUTO_INCREMENT for table `user`
@@ -444,6 +647,70 @@ CREATE DEFINER=`root`@`localhost` EVENT `update_interest_every_10_min` ON SCHEDU
     lastInterestUpdatedAt = NOW()
   WHERE 
     endDate > NOW();
+END$$
+
+CREATE DEFINER=`root`@`localhost` EVENT `calculate_totalinterest_monthly` ON SCHEDULE EVERY 1 MONTH STARTS '2025-06-16 14:12:44' ON COMPLETION PRESERVE ENABLE DO BEGIN
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE loan_id INT;
+    DECLARE loan_start_date DATETIME;
+    DECLARE loan_updated_amount DECIMAL(10,2);
+    DECLARE loan_rate DECIMAL(5,2);
+    DECLARE loan_last_updated DATE;
+    DECLARE current_total_interest DECIMAL(10,2);
+    DECLARE months_passed INT;
+    DECLARE monthly_interest DECIMAL(10,2);
+    DECLARE interest_to_add DECIMAL(10,2);
+    
+    -- Cursor to iterate through all active loans
+    DECLARE loan_cursor CURSOR FOR 
+        SELECT 
+            loanId, 
+            startDate, 
+            updatedAmount, 
+            rate, 
+            lastInterestUpdatedAt,
+            totalInterest
+        FROM loan 
+        WHERE updatedAmount > 0;
+    
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+    
+    -- Start processing loans
+    OPEN loan_cursor;
+    
+    loan_loop: LOOP
+        FETCH loan_cursor INTO 
+            loan_id, 
+            loan_start_date, 
+            loan_updated_amount, 
+            loan_rate, 
+            loan_last_updated,
+            current_total_interest;
+        
+        IF done THEN
+            LEAVE loan_loop;
+        END IF;
+        
+        -- Calculate monthly interest amount
+        SET monthly_interest = ROUND((loan_updated_amount * loan_rate) / 100, 2);
+        
+        -- Add monthly interest to totalInterest every month
+        -- This provides real monthly interest accumulation for production use
+        
+        -- Add the monthly interest amount to totalInterest
+        UPDATE loan 
+        SET 
+            interest = monthly_interest,
+            totalInterest = totalInterest + monthly_interest,
+            lastInterestUpdatedAt = NOW()
+        WHERE loanId = loan_id;
+        
+    END LOOP;
+    
+    CLOSE loan_cursor;
+    
+    -- Monthly interest calculation completed - totalInterest updated for all active loans
+    
 END$$
 
 DELIMITER ;

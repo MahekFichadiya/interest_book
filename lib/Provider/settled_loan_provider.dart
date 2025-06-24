@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:interest_book/Api/getLoanDetail.dart';
+import 'package:interest_book/Api/get_loan_detail.dart';
 import '../Model/settledLoanModel.dart'; // This is the file above
 
 class Settledloanprovider with ChangeNotifier {

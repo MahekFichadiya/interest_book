@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
@@ -115,7 +116,7 @@ class AmountFormatter {
   static Map<String, dynamic> formatWithColor(dynamic amount) {
     double value = _parseToDouble(amount);
     String formattedAmount = formatCurrency(value);
-    
+
     if (value > 0) {
       return {
         'amount': '+$formattedAmount',
@@ -133,6 +134,49 @@ class AmountFormatter {
         'amount': formattedAmount,
         'color': 'black',
         'isPositive': null,
+      };
+    }
+  }
+
+  /// Format interest amount with advance payment indication
+  /// When totalInterest is negative, it means advance payment (show in green with +)
+  /// When totalInterest is positive, it means amount due (show normally)
+  static Map<String, dynamic> formatInterestWithAdvancePayment(dynamic totalInterest) {
+    double value = _parseToDouble(totalInterest);
+
+    if (value < 0) {
+      // Negative totalInterest means advance payment
+      double advanceAmount = value.abs(); // Convert to positive
+      return {
+        'amount': '+${formatCurrencyWithDecimals(advanceAmount)}',
+        'color': const Color(0xFF2E7D32), // Dark green for better contrast (Material Green 800)
+        'lightColor': const Color(0xFFE8F5E8), // Light green background
+        'borderColor': const Color(0xFF4CAF50), // Medium green border
+        'isAdvancePayment': true,
+        'displayText': 'Advance Payment',
+        'icon': Icons.trending_up,
+      };
+    } else if (value > 0) {
+      // Positive totalInterest means amount due
+      return {
+        'amount': formatCurrencyWithDecimals(value),
+        'color': const Color(0xFFE65100), // Dark orange for better contrast (Material Orange 900)
+        'lightColor': const Color(0xFFFFF3E0), // Light orange background
+        'borderColor': const Color(0xFFFF9800), // Medium orange border
+        'isAdvancePayment': false,
+        'displayText': 'Interest Due',
+        'icon': Icons.schedule,
+      };
+    } else {
+      // Zero means no interest due or advance
+      return {
+        'amount': formatCurrencyWithDecimals(0),
+        'color': const Color(0xFF424242), // Dark grey for better contrast (Material Grey 800)
+        'lightColor': const Color(0xFFF5F5F5), // Light grey background
+        'borderColor': const Color(0xFF9E9E9E), // Medium grey border
+        'isAdvancePayment': false,
+        'displayText': 'No Interest',
+        'icon': Icons.check_circle,
       };
     }
   }

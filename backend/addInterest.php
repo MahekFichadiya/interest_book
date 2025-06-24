@@ -20,6 +20,8 @@ try {
     }
 
     // Insert interest payment record
+    // Note: The database trigger 'deduct_interest_payment' will automatically
+    // deduct the payment amount from totalInterest field
     $interestQuery = "INSERT INTO interest (interestAmount, interestDate, interestNote, loanId) VALUES (?, ?, ?, ?)";
     $interestStmt = mysqli_prepare($con, $interestQuery);
     mysqli_stmt_bind_param($interestStmt, "dssi", $interestAmount, $interestDate, $interestNote, $loanId);
@@ -28,16 +30,8 @@ try {
         throw new Exception("Failed to insert interest payment: " . mysqli_error($con));
     }
 
-    // Update loan: deduct interest payment from totalInterest
-    $updateLoanQuery = "UPDATE loan SET
-                        totalInterest = GREATEST(0, totalInterest - ?)
-                        WHERE loanId = ?";
-    $updateStmt = mysqli_prepare($con, $updateLoanQuery);
-    mysqli_stmt_bind_param($updateStmt, "di", $interestAmount, $loanId);
-
-    if (!mysqli_stmt_execute($updateStmt)) {
-        throw new Exception("Failed to update loan interest: " . mysqli_error($con));
-    }
+    // The totalInterest deduction is now handled automatically by the database trigger
+    // This ensures consistency and prevents double deduction
 
     // Commit transaction
     mysqli_commit($con);
@@ -70,5 +64,3 @@ try {
     // Restore autocommit
     mysqli_autocommit($con, TRUE);
 }
-
-?>

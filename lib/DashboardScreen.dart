@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Home/HomePage.dart';
-import 'package:interest_book/Profile/ProfileScreen.dart';
+import 'package:interest_book/Profile/profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});

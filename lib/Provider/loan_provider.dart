@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:interest_book/Api/getLoanDetail.dart';
+import 'package:interest_book/Api/get_loan_detail.dart';
 import 'package:interest_book/Api/interest.dart';
 import 'package:interest_book/Model/LoanDetail.dart';
 
@@ -24,17 +24,33 @@ class LoanProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // First update monthly interest for all loans to ensure current calculations
-      await interestApi().updateMonthlyInterest();
+      // Validate input parameters
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID is required');
+      }
 
-      // Then trigger automatic interest calculation for accumulation
-      await interestApi().triggerAutomaticInterestCalculation();
-
-      // Finally fetch the updated loan data
+      // Try to fetch loan data first (most critical operation)
       _loanDetail = await getLoanDetail().loanList(userId, custId);
       _calculateTotals(); // Calculate totals after fetching data
+
+      // Try to update interest calculations (optional operations)
+      // If these fail, we still have the loan data
+      try {
+        await interestApi().updateMonthlyInterest();
+        await interestApi().triggerAutomaticInterestCalculation();
+
+        // Refetch data after interest calculations
+        _loanDetail = await getLoanDetail().loanList(userId, custId);
+        _calculateTotals();
+      } catch (interestError) {
+        print('Interest calculation failed, but loan data is available: $interestError');
+        // Continue with existing loan data
+      }
+
     } catch (e) {
-      _errorMessage = 'Failed to load loan details. Please try again later.';
+      print('Error in fetchLoanDetailList: $e');
+      _errorMessage = 'Failed to load loan details: ${e.toString()}';
+      _loanDetail = []; // Clear existing data on error
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -81,5 +97,42 @@ class LoanProvider extends ChangeNotifier {
   void refreshTotals() {
     _calculateTotals();
     notifyListeners();
+  }
+
+  // Force refresh method to trigger UI updates
+  void forceRefresh() {
+    notifyListeners();
+  }
+
+  // Simple fetch method without interest calculations (for quick navigation)
+  Future<void> fetchLoanDetailListSimple(String? userId, String? custId) async {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID is required');
+      }
+
+      _loanDetail = await getLoanDetail().loanList(userId, custId);
+      _calculateTotals();
+
+    } catch (e) {
+      _errorMessage = 'Failed to load loan details: ${e.toString()}';
+      _loanDetail = [];
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Get updated loan data for a specific loan
+  Loandetail? getLoanById(String loanId) {
+    try {
+      return _loanDetail.firstWhere((loan) => loan.loanId == loanId);
+    } catch (e) {
+      return null;
+    }
   }
 }

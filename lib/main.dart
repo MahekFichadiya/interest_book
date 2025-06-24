@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Login&Signup/splashScreen.dart';
-import 'package:interest_book/Provider/LoanProvider.dart';
-import 'package:interest_book/Provider/ProfileProvider.dart';
-import 'package:interest_book/Provider/backupedCustomerProvider.dart';
-import 'package:interest_book/Provider/depositeProvider.dart';
-import 'package:interest_book/Provider/settledLoanProvider.dart';
+import 'package:interest_book/Provider/backuped_customer_provider.dart';
+import 'package:interest_book/Provider/customer_provider.dart';
+import 'package:interest_book/Provider/deposite_provider.dart';
+import 'package:interest_book/Provider/interest_provider.dart';
+import 'package:interest_book/Provider/loan_provider.dart';
+import 'package:interest_book/Provider/profile_provider.dart';
+import 'package:interest_book/Provider/settled_loan_provider.dart';
+import 'package:interest_book/Utils/app_colors.dart';
 import 'package:provider/provider.dart';
-import 'Provider/CustomerProvider.dart';
-import 'Provider/interestProvider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -46,6 +47,65 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primarySwatch: Colors.blueGrey,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: AppColors.primary,
+            brightness: Brightness.light,
+          ),
+          scaffoldBackgroundColor: AppColors.background,
+          cardColor: AppColors.surface,
+          dividerColor: AppColors.divider,
+          // Enhanced text theme with better contrast
+          textTheme: const TextTheme(
+            displayLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+            displayMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+            displaySmall: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+            headlineLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+            headlineMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+            headlineSmall: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+            titleLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+            titleMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+            titleSmall: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+            bodyLarge: TextStyle(color: AppColors.textPrimary),
+            bodyMedium: TextStyle(color: AppColors.textSecondary),
+            bodySmall: TextStyle(color: AppColors.textSecondary),
+            labelLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+            labelMedium: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+            labelSmall: TextStyle(color: AppColors.textTertiary, fontWeight: FontWeight.w500),
+          ),
+          // Enhanced app bar theme
+          appBarTheme: AppBarTheme(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 2,
+            shadowColor: AppColors.shadowMedium,
+            titleTextStyle: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          // Enhanced card theme
+          cardTheme: CardTheme(
+            color: AppColors.surface,
+            elevation: 2,
+            shadowColor: AppColors.shadowLight,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: AppColors.border, width: 0.5),
+            ),
+          ),
+          // Enhanced elevated button theme
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 2,
+              shadowColor: AppColors.shadowMedium,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
         ),
         home: SplashScreen(),
       ),

@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:interest_book/Api/UrlConstant.dart';
-import 'package:interest_book/Api/updateLoanAPI.dart';
+import 'package:interest_book/Api/update_loan_api.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanDashborad.dart';
 import 'package:interest_book/Model/CustomerModel.dart';
 import 'package:interest_book/Model/LoanDetail.dart';
+import 'package:interest_book/Provider/loan_provider.dart';
+import 'package:interest_book/Provider/profile_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'image_picker/screen/select_photo_options_screen.dart';
 import 'package:provider/provider.dart';
-import '../../Provider/LoanProvider.dart';
+
 
 class EditLoan extends StatefulWidget {
   final Customer customer;
@@ -671,7 +673,9 @@ class _EditLoanState extends State<EditLoan> {
         );
 
         // Close loading dialog
-        Navigator.pop(context);
+        if (mounted) {
+          Navigator.pop(context);
+        }
 
         if (success) {
           // Also refresh the loan provider to update all screens
@@ -682,38 +686,52 @@ class _EditLoanState extends State<EditLoan> {
               context,
               listen: false,
             ).fetchLoanDetailList(userId, custId!);
+
+            // Also refresh the profile provider to update profile screen amounts
+            if (mounted) {
+              await Provider.of<ProfileProvider>(
+                context,
+                listen: false,
+              ).fetchMoneyInfo();
+            }
           }
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Loan updated successfully")),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Loan updated successfully")),
+            );
 
-          // Navigate to LoanDashboard instead of just popping
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder:
-                  (context) => Loandashboard(custId: widget.customer.custId!),
-            ),
-            (route) => false, // This removes all previous routes from the stack
-          );
+            // Navigate to LoanDashboard instead of just popping
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder:
+                    (context) => Loandashboard(custId: widget.customer.custId!),
+              ),
+              (route) => false, // This removes all previous routes from the stack
+            );
+          }
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to update loan")),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Failed to update loan")),
+            );
+          }
         }
       } catch (e) {
         // Close loading dialog
-        Navigator.pop(context);
+        if (mounted) {
+          Navigator.pop(context);
 
-        // Show a user-friendly error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "An error occurred while updating the loan. Please try again.",
+          // Show a user-friendly error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "An error occurred while updating the loan. Please try again.",
+              ),
+              backgroundColor: Colors.red,
             ),
-            backgroundColor: Colors.red,
-          ),
-        );
+          );
+        }
       }
     }
   }

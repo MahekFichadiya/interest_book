@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:interest_book/Api/updateCustomer.dart';
+import 'package:interest_book/Api/update_customer.dart';
 import 'package:interest_book/Model/CustomerModel.dart';
-import 'package:interest_book/Provider/CustomerProvider.dart';
+import 'package:interest_book/Provider/customer_provider.dart';
 import 'package:provider/provider.dart';
 
 class EditContact extends StatefulWidget {

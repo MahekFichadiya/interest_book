@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:interest_book/Provider/interest_provider.dart';
+import 'package:interest_book/Provider/loan_provider.dart';
+import 'package:interest_book/Provider/profile_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 import '../../Api/interest.dart';
-import '../../Provider/interestProvider.dart';
-import '../../Provider/LoanProvider.dart';
+import '../../Widgets/amount_form_field.dart';
 
 class AddInterestScreen extends StatefulWidget {
   final String loanId;
@@ -27,8 +30,8 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
   @override
   void initState() {
     super.initState();
-    // Set current date as default
-    _dateController.text = DateTime.now().toString().split(' ')[0];
+    // Set current date as default in dd/MM/yyyy format
+    _dateController.text = DateFormat("dd/MM/yyyy").format(DateTime.now());
   }
 
   @override
@@ -37,6 +40,44 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
     _dateController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  void _showSnackBar(String message, {bool isError = false, bool showRetry = false}) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error : Icons.check_circle,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: Duration(seconds: isError ? 4 : 3),
+        behavior: SnackBarBehavior.floating,
+        action: showRetry ? SnackBarAction(
+          label: 'Retry',
+          textColor: Colors.white,
+          onPressed: () {
+            if (!_isLoading) {
+              _saveInterest();
+            }
+          },
+        ) : null,
+      ),
+    );
+  }
+
+  // Convert display format (dd/MM/yyyy) to MySQL format (yyyy-MM-dd)
+  String getFormattedDateForMySQL(String dateTime) {
+    final DateTime parsedDateTime = DateFormat("dd/MM/yyyy").parse(dateTime);
+    return DateFormat("yyyy-MM-dd").format(parsedDateTime);
   }
 
   Future<void> _selectDate() async {
@@ -62,7 +103,7 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
 
     if (picked != null) {
       setState(() {
-        _dateController.text = picked.toString().split(' ')[0];
+        _dateController.text = DateFormat("dd/MM/yyyy").format(picked);
       });
     }
   }
@@ -73,14 +114,23 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Get raw amount value for API
+      String rawAmount = AmountFormFieldHelper.getRawAmount(_amountController);
+
+      // Convert date from display format (dd/MM/yyyy) to MySQL format (yyyy-MM-dd)
+      String formattedDate = getFormattedDateForMySQL(_dateController.text);
+
       final success = await interestApi().addInterest(
-        _amountController.text,
-        _dateController.text,
+        rawAmount,
+        formattedDate,
         _noteController.text,
         widget.loanId,
       );
 
       if (success) {
+        // Small delay to ensure database operations are completed
+        await Future.delayed(const Duration(milliseconds: 500));
+
         // Refresh the interest list
         if (mounted) {
           await Provider.of<Interestprovider>(context, listen: false)
@@ -97,35 +147,35 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
           // Refresh loan provider which will trigger interest calculation
           await Provider.of<LoanProvider>(context, listen: false)
               .fetchLoanDetailList(userId, custId);
+
+          // Also refresh the profile provider to update profile screen amounts
+          if (mounted) {
+            await Provider.of<ProfileProvider>(context, listen: false)
+                .fetchMoneyInfo();
+          }
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Interest payment added successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showSnackBar('Interest payment added successfully');
           Navigator.pop(context, true);
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to add interest payment'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showSnackBar('Failed to add interest payment. Please try again.', isError: true, showRetry: true);
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        String errorMessage = 'An unexpected error occurred';
+        if (e.toString().contains('network') || e.toString().contains('connection')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (e.toString().contains('timeout')) {
+          errorMessage = 'Request timeout. Please try again.';
+        } else if (e.toString().contains('server')) {
+          errorMessage = 'Server error. Please try again later.';
+        }
+
+        _showSnackBar(errorMessage, isError: true, showRetry: true);
       }
     } finally {
       if (mounted) {
@@ -165,38 +215,13 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
                 const SizedBox(height: 20),
                 
                 // Amount Field
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        spreadRadius: 1,
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: TextFormField(
-                    controller: _amountController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      hintText: 'Amount',
-                      hintStyle: TextStyle(color: Colors.grey),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.all(16),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter amount';
-                      }
-                      if (double.tryParse(value) == null || double.parse(value) <= 0) {
-                        return 'Please enter valid amount';
-                      }
-                      return null;
-                    },
-                  ),
+                AmountFormField(
+                  controller: _amountController,
+                  label: "Amount",
+                  hintText: "Enter interest amount",
+                  prefixIcon: Icons.attach_money_rounded,
+                  showCurrencySymbol: false,
+                  allowDecimals: false,
                 ),
         
                 const SizedBox(height: 16),

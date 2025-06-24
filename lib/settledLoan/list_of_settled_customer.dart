@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:interest_book/Provider/backupedCustomerProvider.dart';
+import 'package:interest_book/Api/show_customer.dart';
+import 'package:interest_book/Provider/backuped_customer_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../Api/ShowCustomer.dart';
 import '../Model/backupedCustomerModel.dart';
 
 class Listofsettledcustomer extends StatefulWidget {

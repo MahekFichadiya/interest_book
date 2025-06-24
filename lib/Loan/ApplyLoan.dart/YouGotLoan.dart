@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:interest_book/Api/AddLoanAPI.dart';
+import 'package:interest_book/Api/add_loan_api.dart';
+import 'package:interest_book/Provider/loan_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import '../../Provider/LoanProvider.dart';
 import '../image_picker/screen/select_photo_options_screen.dart';
 import 'package:intl/intl.dart';
 

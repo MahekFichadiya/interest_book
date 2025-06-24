@@ -135,14 +135,17 @@ END$$
 DELIMITER ;
 
 -- Create a trigger to automatically update totalInterest when interest payments are made
+-- Note: This trigger provides database-level backup for interest payment deduction
+-- The main deduction logic is handled in addInterest.php API
 DELIMITER $$
 
-CREATE TRIGGER `deduct_interest_payment`
+CREATE TRIGGER IF NOT EXISTS `deduct_interest_payment`
 AFTER INSERT ON `interest`
 FOR EACH ROW
 BEGIN
     -- Deduct the interest payment from totalInterest
-    UPDATE loan 
+    -- Using GREATEST to ensure totalInterest never goes below 0
+    UPDATE loan
     SET totalInterest = GREATEST(0, totalInterest - NEW.interestAmount)
     WHERE loanId = NEW.loanId;
 END$$

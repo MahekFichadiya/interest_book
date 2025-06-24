@@ -11,6 +11,14 @@ class Depositeprovider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String get errorMessage => _errorMessage;
 
+  // Get total deposits for a specific loan
+  double getTotalDeposits() {
+    return _deposite.fold<double>(
+      0.0,
+      (sum, deposit) => sum + (double.tryParse(deposit.depositeAmount) ?? 0.0),
+    );
+  }
+
   // Fetch deposit list by loanId
   Future<void> fetchDepositeList(String loanId) async {
     _isLoading = true;
@@ -25,5 +33,10 @@ class Depositeprovider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Force immediate refresh for real-time updates
+  void forceRefresh() {
+    notifyListeners();
   }
 }

@@ -14,6 +14,7 @@ class Loandetail {
     required this.custId,
     required this.interest,
     required this.totalInterest,
+    required this.dailyInterest,
      this.lastInterestUpdatedAt,
   });
   late final String loanId;
@@ -30,6 +31,7 @@ class Loandetail {
   late final String custId;
   late final String interest;
   late final String totalInterest;
+  late final String dailyInterest;
   late final Null lastInterestUpdatedAt;
   
   Loandetail.fromJson(Map<String, dynamic> json){
@@ -47,26 +49,28 @@ class Loandetail {
     custId = json['custId'];
     interest = json['interest'];
     totalInterest = json['totalInterest'];
+    dailyInterest = json['dailyInterest'] ?? '0';
     lastInterestUpdatedAt = null;
   }
 
   Map<String, dynamic> toJson() {
-    final _data = <String, dynamic>{};
-    _data['loanId'] = loanId;
-    _data['amount'] = amount;
-    _data['rate'] = rate;
-    _data['startDate'] = startDate;
-    _data['endDate'] = endDate;
-    _data['image'] = image;
-    _data['note'] = note;
-    _data['updatedAmount'] = updatedAmount;
-    _data['totalDeposite'] = totalDeposite;
-    _data['type'] = type;
-    _data['userId'] = userId;
-    _data['custId'] = custId;
-    _data['interest'] = interest;
-    _data['totalInterest'] = totalInterest;
-    _data['lastInterestUpdatedAt'] = lastInterestUpdatedAt;
-    return _data;
+    final data = <String, dynamic>{};
+    data['loanId'] = loanId;
+    data['amount'] = amount;
+    data['rate'] = rate;
+    data['startDate'] = startDate;
+    data['endDate'] = endDate;
+    data['image'] = image;
+    data['note'] = note;
+    data['updatedAmount'] = updatedAmount;
+    data['totalDeposite'] = totalDeposite;
+    data['type'] = type;
+    data['userId'] = userId;
+    data['custId'] = custId;
+    data['interest'] = interest;
+    data['totalInterest'] = totalInterest;
+    data['dailyInterest'] = dailyInterest;
+    data['lastInterestUpdatedAt'] = lastInterestUpdatedAt;
+    return data;
   }
 }

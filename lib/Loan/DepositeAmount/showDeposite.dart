@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:interest_book/Provider/depositeProvider.dart';
+import 'package:interest_book/Provider/deposite_provider.dart';
 import 'package:interest_book/Utils/amount_formatter.dart';
 import 'package:provider/provider.dart';
 

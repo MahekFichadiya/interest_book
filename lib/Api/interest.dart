@@ -27,8 +27,19 @@ class interestApi {
       try {
         var responseData = json.decode(response.body);
         print("Response from server: $responseData");
-        // If your API returns just `1`, then:
-        return responseData == 1;
+
+        // Check for different possible success responses
+        if (responseData is Map<String, dynamic>) {
+          // New API format: {"status": "success", "message": "..."}
+          String status = responseData['status']?.toString() ?? '';
+          return status == 'success' || status == 'true';
+        } else if (responseData == 1 || responseData == "1" || responseData == true || responseData == "true") {
+          // Old API format: returns 1, "1", true, or "true" for success
+          return true;
+        } else {
+          print("Unexpected response format: $responseData");
+          return false;
+        }
       } catch (e) {
         print("Error decoding JSON: $e");
         print("Response body: ${response.body}");
@@ -36,6 +47,7 @@ class interestApi {
       }
     } else {
       print("Failed with status code: ${response.statusCode}");
+      print("Response body: ${response.body}");
       return false;
     }
   }
@@ -81,8 +93,19 @@ class interestApi {
       try {
         var responseData = json.decode(response.body);
         print("Response from server: $responseData");
-        // If your API returns just `1`, then:
-        return responseData == 1;
+
+        // Check for different possible success responses
+        if (responseData is Map<String, dynamic>) {
+          // New API format: {"status": "success", "message": "..."}
+          String status = responseData['status']?.toString() ?? '';
+          return status == 'success' || status == 'true';
+        } else if (responseData == 1 || responseData == "1" || responseData == true || responseData == "true") {
+          // Old API format: returns 1, "1", true, or "true" for success
+          return true;
+        } else {
+          print("Unexpected response format: $responseData");
+          return false;
+        }
       } catch (e) {
         print("Error decoding JSON: $e");
         print("Response body: ${response.body}");
@@ -90,6 +113,7 @@ class interestApi {
       }
     } else {
       print("Failed with status code: ${response.statusCode}");
+      print("Response body: ${response.body}");
       return false;
     }
   }

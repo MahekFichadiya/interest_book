@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:interest_book/Api/AddCustomer.dart';
-import 'package:interest_book/Provider/CustomerProvider.dart';
+import 'package:interest_book/Api/add_customer.dart';
+import 'package:interest_book/Provider/customer_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';

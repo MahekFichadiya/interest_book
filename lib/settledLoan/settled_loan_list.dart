@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:interest_book/Provider/settled_loan_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
-import '../Provider/settledLoanProvider.dart';
 
 class Settledloanlist extends StatefulWidget {
   const Settledloanlist({super.key});

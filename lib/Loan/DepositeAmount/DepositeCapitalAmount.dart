@@ -3,10 +3,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:interest_book/Api/interest.dart';
 import 'package:interest_book/Loan/DepositeAmount/showDeposite.dart';
+import 'package:interest_book/Provider/deposite_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
-import '../../Provider/depositeProvider.dart';
 
 class DepositeCapitalAmount extends StatefulWidget {
   final String? loanId;

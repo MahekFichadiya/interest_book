@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Api/UrlConstant.dart';
 import 'package:interest_book/Loan/EditLoan.dart';
+import 'package:interest_book/Provider/deposite_provider.dart';
+import 'package:interest_book/Provider/interest_provider.dart';
+import 'package:interest_book/Provider/loan_provider.dart';
 import 'package:provider/provider.dart';
 // import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // Uncomment if using FontAwesome
 import '../../Model/CustomerModel.dart';
 import '../../Model/LoanDetail.dart';
 import '../../Api/interest.dart';
-import '../../Provider/depositeProvider.dart';
-import '../../Provider/interestProvider.dart';
 import '../../Utils/amount_formatter.dart';
+import '../../Widgets/interest_amount_display.dart';
 import '../DepositeAmount/add_deposit_screen.dart';
 import '../InterestAmount/add_interest_screen.dart';
-import '../../Provider/LoanProvider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // import '../../Utils/whatsapp_helper.dart';
 
@@ -33,6 +34,16 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
   Map<String, dynamic>? calculationData;
   bool isLoading = true;
 
+  // Calculate remaining balance immediately from current data
+  int _calculateRemainingBalance(Loandetail loan, List<dynamic> deposits) {
+    final originalAmount = double.tryParse(loan.amount) ?? 0.0;
+    final totalDeposits = deposits.fold<double>(
+      0.0,
+      (sum, deposit) => sum + (double.tryParse(deposit.depositeAmount) ?? 0.0),
+    );
+    return (originalAmount - totalDeposits).clamp(0.0, double.infinity).toInt();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,26 +54,54 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => isLoading = true);
 
-    // Load deposits and interest data
-    await Provider.of<Depositeprovider>(
-      context,
-      listen: false,
-    ).fetchDepositeList(widget.loanDetail.loanId);
-    await Provider.of<Interestprovider>(
-      context,
-      listen: false,
-    ).fetchInterestList(widget.loanDetail.loanId);
+    try {
+      // Load deposits and interest data
+      if (mounted) {
+        await Provider.of<Depositeprovider>(
+          context,
+          listen: false,
+        ).fetchDepositeList(widget.loanDetail.loanId);
+      }
 
-    // Load calculation data
-    final result = await interestApi().calculateMonthlyInterest(
-      widget.loanDetail.loanId,
-    );
-    setState(() {
-      calculationData = result;
-      isLoading = false;
-    });
+      if (mounted) {
+        await Provider.of<Interestprovider>(
+          context,
+          listen: false,
+        ).fetchInterestList(widget.loanDetail.loanId);
+      }
+
+      // Refresh loan data to get updated amounts
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString("userId");
+      final custId = prefs.getString("custId");
+
+      if (userId != null && mounted) {
+        await Provider.of<LoanProvider>(context, listen: false)
+            .fetchLoanDetailList(userId, custId);
+      }
+
+      // Load calculation data with fresh loan information
+      final result = await interestApi().calculateMonthlyInterest(
+        widget.loanDetail.loanId,
+      );
+
+      if (mounted) {
+        setState(() {
+          calculationData = result;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+      print("Error loading data: $e");
+    }
   }
 
   @override
@@ -73,6 +112,34 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
         title: const Text('Entry Details'),
         backgroundColor: Colors.blueGrey[700],
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () async {
+            // Store context reference before async operations
+            final navigator = Navigator.of(context);
+
+            // Refresh loan data before going back to ensure consistency
+            try {
+              if (mounted) {
+                final loanProvider = Provider.of<LoanProvider>(context, listen: false);
+                final prefs = await SharedPreferences.getInstance();
+                final userId = prefs.getString("userId");
+                if (userId != null && mounted) {
+                  // Use simple fetch for faster navigation
+                  await loanProvider.fetchLoanDetailListSimple(userId, widget.customer.custId);
+                }
+              }
+            } catch (e) {
+              // If refresh fails, still allow navigation
+              debugPrint('Failed to refresh data on back navigation: $e');
+            }
+
+            // Navigate back
+            if (mounted) {
+              navigator.pop();
+            }
+          },
+        ),
         actions: [
           TextButton(
             onPressed: () async {
@@ -136,10 +203,26 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
   }
 
   Widget _buildLoanHeader() {
-    final remainingBalance =
-        calculationData?['remainingBalance']?.toInt() ??
-        int.tryParse(widget.loanDetail.updatedAmount) ??
-        0;
+    return Consumer2<LoanProvider, Depositeprovider>(
+      builder: (context, loanProvider, depositProvider, child) {
+        // Find the current loan from the provider to get the most up-to-date data
+        final currentLoan = loanProvider.detail.firstWhere(
+          (loan) => loan.loanId == widget.loanDetail.loanId,
+          orElse: () => widget.loanDetail,
+        );
+
+        // Calculate remaining balance immediately from current data
+        final calculatedRemainingBalance = _calculateRemainingBalance(currentLoan, depositProvider.deposite);
+
+        // Use calculated balance for immediate updates, fallback to API data
+        final remainingBalance = calculatedRemainingBalance;
+
+        return _buildLoanHeaderContent(currentLoan, remainingBalance);
+      },
+    );
+  }
+
+  Widget _buildLoanHeaderContent(Loandetail currentLoan, int remainingBalance) {
 
     return Container(
       width: double.infinity,
@@ -149,7 +232,7 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
             offset: const Offset(0, 2),
@@ -168,7 +251,7 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            AmountFormatter.formatCurrency(widget.loanDetail.amount),
+            AmountFormatter.formatCurrency(currentLoan.amount),
             style: const TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
@@ -177,7 +260,7 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'On ${_formatDate(widget.loanDetail.startDate)}',
+            'On ${_formatDate(currentLoan.startDate)}',
             style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
           const SizedBox(height: 12),
@@ -242,7 +325,13 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
                       ),
                     );
                     if (result == true) {
-                      _loadData();
+                      // Force immediate UI refresh for both providers
+                      if (mounted) {
+                        Provider.of<Depositeprovider>(context, listen: false).forceRefresh();
+                        Provider.of<LoanProvider>(context, listen: false).forceRefresh();
+                        // Then load fresh data in background
+                        _loadData();
+                      }
                     }
                   },
                   icon: const Icon(Icons.add_circle, color: Colors.blueGrey),
@@ -323,8 +412,14 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
   }
 
   Widget _buildLoanDetailsSection() {
-    final months = calculationData?['totalMonths'] ?? 0;
     final rate = double.tryParse(widget.loanDetail.rate) ?? 0;
+
+    // Calculate months passed since loan started
+    final monthsPassed = _calculateMonthsPassed(widget.loanDetail.startDate);
+
+    // Calculate daily interest from monthly interest (interest ÷ 30)
+    final monthlyInterest = double.tryParse(widget.loanDetail.interest) ?? 0;
+    final dailyInterest = monthlyInterest / 30;
 
     // Construct the full image URL
     String? imageUrl;
@@ -364,118 +459,20 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
                 ? "N/A"
                 : _formatReturnDate(widget.loanDetail.endDate),
           ),
-          _buildDetailRow(
-            'Interest',
-            AmountFormatter.formatCurrencyWithDecimals(calculationData?['totalAccumulatedInterest'] ?? 0),
+          InterestDetailRow(
+            label: 'Interest',
+            totalInterest: widget.loanDetail.totalInterest,
           ),
-          _buildDetailRow('Months', '$months'),
+          _buildDetailRow('Months Passed', '$monthsPassed'),
           _buildDetailRow('Rate', AmountFormatter.formatPercentage(rate)),
           _buildDetailRow('Note', widget.loanDetail.note),
-          SizedBox(height: 5),
-          // Add loan image
-          if (imageUrl != null)
-            GestureDetector(
-              onTap: () {
-                // Show full image when tapped
-                showDialog(
-                  context: context,
-                  builder:
-                      (context) => Dialog(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.close),
-                                    onPressed:
-                                        () => Navigator.of(context).pop(),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Image.network(
-                              imageUrl!,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                print("Image error: $error");
-                                return const Padding(
-                                  padding: EdgeInsets.all(20.0),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.broken_image,
-                                        size: 64,
-                                        color: Colors.red,
-                                      ),
-                                      SizedBox(height: 16),
-                                      Text(
-                                        "Image could not be loaded",
-                                        style: TextStyle(fontSize: 16),
-                                      ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        "The image may have been moved or deleted",
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                );
-              },
-              child: Container(
-                height: 200,
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      print("Image error in header: $error");
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.image_not_supported,
-                              size: 50,
-                              color: Colors.grey,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              "Image not available",
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
+          _buildDetailRow(
+            'Daily Interest',
+            AmountFormatter.formatCurrencyWithDecimals(dailyInterest),
+          ),
+          const SizedBox(height: 16),
+          // Enhanced loan image section
+          _buildLoanImageSection(imageUrl),
         ],
       ),
     );
@@ -529,7 +526,12 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
                       ),
                     );
                     if (result == true) {
-                      _loadData();
+                      // Force immediate UI refresh
+                      if (mounted) {
+                        Provider.of<LoanProvider>(context, listen: false).forceRefresh();
+                        // Then load fresh data
+                        await _loadData();
+                      }
                     }
                   },
                   icon: const Icon(Icons.add_circle, color: Colors.blueGrey),
@@ -752,5 +754,388 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
     } catch (e) {
       return dateStr;
     }
+  }
+
+  int _calculateMonthsPassed(String startDateStr) {
+    try {
+      final startDate = DateTime.parse(startDateStr);
+      final currentDate = DateTime.now();
+
+      // Calculate the difference in months
+      int months = (currentDate.year - startDate.year) * 12 +
+                   (currentDate.month - startDate.month);
+
+      // If the current day is before the start day, subtract one month
+      if (currentDate.day < startDate.day) {
+        months--;
+      }
+
+      return months.clamp(0, double.infinity).toInt();
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  Widget _buildLoanImageSection(String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return _buildNoImagePlaceholder();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section header
+        Row(
+          children: [
+            Icon(
+              Icons.photo_library_outlined,
+              color: Colors.blueGrey[600],
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Loan Document',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.blueGrey[700],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Image container with enhanced design
+        GestureDetector(
+          onTap: () => _showFullScreenImage(imageUrl),
+          child: Container(
+            width: double.infinity,
+            height: 220,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blueGrey.withValues(alpha: 0.1),
+                  spreadRadius: 2,
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  // Main image
+                  Image.network(
+                    imageUrl,
+                    width: double.infinity,
+                    height: double.infinity,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return _buildImageLoadingPlaceholder();
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return _buildImageErrorPlaceholder();
+                    },
+                  ),
+
+                  // Gradient overlay for better text visibility
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 60,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.7),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Tap to view indicator
+                  Positioned(
+                    bottom: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.blueGrey.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.zoom_in,
+                            size: 16,
+                            color: Colors.blueGrey[700],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Tap to view',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.blueGrey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNoImagePlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: 120,
+      decoration: BoxDecoration(
+        color: Colors.blueGrey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.blueGrey[200]!,
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.image_outlined,
+            size: 40,
+            color: Colors.blueGrey[400],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No document attached',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.blueGrey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageLoadingPlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.blueGrey[50],
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.blueGrey),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Loading image...',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.blueGrey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageErrorPlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.red[50],
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.broken_image_outlined,
+            size: 48,
+            color: Colors.red[400],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Failed to load image',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.red[700],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tap to retry',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.red[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFullScreenImage(String imageUrl) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            // Background overlay
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: double.infinity,
+                height: double.infinity,
+                color: Colors.black.withValues(alpha: 0.8),
+              ),
+            ),
+
+            // Image container with zoom functionality
+            Center(
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width - 32,
+                  maxHeight: MediaQuery.of(context).size.height - 100,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      spreadRadius: 2,
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: InteractiveViewer(
+                    panEnabled: true,
+                    scaleEnabled: true,
+                    minScale: 0.5,
+                    maxScale: 5.0,
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          width: 300,
+                          height: 300,
+                          color: Colors.white,
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 300,
+                          height: 200,
+                          color: Colors.white,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.broken_image_outlined,
+                                size: 64,
+                                color: Colors.red[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                "Failed to load image",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.red[700],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "The image may have been moved or deleted",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Close button
+            Positioned(
+              top: 40,
+              right: 20,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        spreadRadius: 1,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.black87,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

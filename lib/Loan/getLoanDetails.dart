@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
-import 'package:interest_book/Api/RemoveLoan.dart';
 import 'package:interest_book/Api/UrlConstant.dart';
+import 'package:interest_book/Api/remove_loan.dart';
 import 'package:interest_book/DashboardScreen.dart';
 import 'package:interest_book/Loan/DepositeAmount/InterestDashboard.dart';
 import 'package:interest_book/Loan/EditLoan.dart';

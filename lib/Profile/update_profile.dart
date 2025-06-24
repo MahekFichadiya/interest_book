@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:interest_book/Api/UpdateProfileAPI.dart';
-import 'package:interest_book/Provider/ProfileProvider.dart';
+import 'package:interest_book/Api/update_profile_api.dart';
+import 'package:interest_book/Provider/profile_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 

@@ -60,18 +60,18 @@ include("connection.php");
 
 include("connection.php");
 
-// Fix: Use correct column names from your DB
+// Fix: Use correct column names from your DB - Updated to use updatedAmount
 $stmt = $con->prepare("
-    SELECT 
+    SELECT
         c.custName,
         c.date,
-        SUM(CASE WHEN l.type = 1 THEN l.amount ELSE 0 END) AS you_gave_amount,
-        SUM(CASE WHEN l.type = 0 THEN l.amount ELSE 0 END) AS you_got_amount
-    FROM 
+        SUM(CASE WHEN l.type = 1 THEN l.updatedAmount ELSE 0 END) AS you_gave_amount,
+        SUM(CASE WHEN l.type = 0 THEN l.updatedAmount ELSE 0 END) AS you_got_amount
+    FROM
         customer c
-    LEFT JOIN 
+    LEFT JOIN
         loan l ON c.custId = l.custId AND c.userId = l.userId
-    GROUP BY 
+    GROUP BY
         c.custId, c.userId, c.custName, c.date
 ");
 

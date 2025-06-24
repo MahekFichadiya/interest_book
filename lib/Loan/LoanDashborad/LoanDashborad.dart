@@ -1,15 +1,22 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:interest_book/Api/fetchAllLoansByUserAndCustomer.dart';
+import 'package:interest_book/Api/fetch_all_loans_by_user_and_customer.dart';
 import 'package:interest_book/Contact/EditContact.dart';
 import 'package:interest_book/Loan/ApplyLoan/ApplyLoan.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanList.dart';
-import 'package:interest_book/Provider/CustomerProvider.dart';
-import 'package:interest_book/Provider/LoanProvider.dart';
-import 'package:interest_book/pdfGenerator/generatePdfForPerticularCustomer.dart';
+import 'package:interest_book/Model/CustomerModel.dart';
+import 'package:interest_book/Provider/customer_provider.dart';
+import 'package:interest_book/Provider/loan_provider.dart';
+import 'package:interest_book/Provider/profile_provider.dart';
 import 'package:interest_book/Utils/amount_formatter.dart';
+import 'package:interest_book/Utils/sms_helper.dart';
+import 'package:interest_book/Utils/whatsapp_helper.dart';
+import 'package:interest_book/Utils/reliable_payment_reminder.dart';
+import 'package:interest_book/pdfGenerator/generate_pdf_for_particular_customer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class Loandashboard extends StatefulWidget {
   final String custId;
@@ -40,6 +47,201 @@ class _LoandashboardState extends State<Loandashboard> {
       await launchUrl(url);
     } else {
       throw 'Could not launch $url';
+    }
+  }
+
+  Future<void> _sendSMSMessage(Customer customer, Map<String, dynamic> totals) async {
+    try {
+      // Get values from totals
+      double principalAmount = totals['totalAmount'] ?? 0.0; // This is the current principal
+      double totalInterest = totals['totalInterest'] ?? 0.0; // This is pending interest
+      double totalDue = totals['totalDue'] ?? 0.0; // This is principal + interest
+
+      // Generate the message
+      String message = SMSHelper.generateLoanSummaryMessage(
+        totalAmount: totalDue,
+        totalInterest: totalInterest,
+        principalAmount: principalAmount,
+      );
+
+      // Send SMS
+      await SMSHelper.sendSMS(
+        phoneNumber: customer.custPhn,
+        message: message,
+      );
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('SMS sent successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error message to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send SMS: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _sendWhatsAppPaymentReminder(Customer customer, Map<String, dynamic> totals) async {
+    print('=== WhatsApp Payment Reminder Started ===');
+    print('Customer: ${customer.custName}');
+    print('Totals: $totals');
+
+    try {
+      // Show loading indicator with new text
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Generating payment reminder image...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Get values from totals
+      double principalAmount = totals['totalAmount'] ?? 0.0;
+      double totalInterest = totals['totalInterest'] ?? 0.0;
+      double totalDue = totals['totalDue'] ?? 0.0;
+
+      // Generate payment reminder image with fallback options
+      File? imageFile;
+
+      print('Starting image generation for ${customer.custName}');
+
+      // Try detailed payment reminder first
+      try {
+        print('Trying detailed payment reminder...');
+        imageFile = await ReliablePaymentReminder.generateDetailedPaymentReminder(
+          customerName: customer.custName,
+          principalAmount: principalAmount,
+          interestAmount: totalInterest,
+          totalAmount: totalDue,
+          companyName: 'Interest Book',
+        );
+        if (imageFile != null) {
+          print('Detailed payment reminder generated successfully: ${imageFile.path}');
+        } else {
+          print('Detailed payment reminder returned null');
+        }
+      } catch (e) {
+        print('Detailed payment reminder failed: $e');
+      }
+
+      // If detailed fails, try basic payment reminder
+      if (imageFile == null) {
+        try {
+          print('Trying basic payment reminder...');
+          imageFile = await ReliablePaymentReminder.generateBasicPaymentReminder(
+            customerName: customer.custName,
+            totalAmount: totalDue,
+            companyName: 'Interest Book',
+          );
+          if (imageFile != null) {
+            print('Basic payment reminder generated successfully: ${imageFile.path}');
+          } else {
+            print('Basic payment reminder returned null');
+          }
+        } catch (e) {
+          print('Basic payment reminder failed: $e');
+        }
+      }
+
+      // If both fail, try fallback reminder
+      if (imageFile == null) {
+        try {
+          print('Trying fallback payment reminder...');
+          imageFile = await ReliablePaymentReminder.generateFallbackReminder(
+            customerName: customer.custName,
+            totalAmount: totalDue,
+            companyName: 'Interest Book',
+          );
+          if (imageFile != null) {
+            print('Fallback payment reminder generated successfully: ${imageFile.path}');
+          } else {
+            print('Fallback payment reminder returned null');
+          }
+        } catch (e) {
+          print('Fallback payment reminder failed: $e');
+        }
+      }
+
+      print('Final imageFile status: ${imageFile != null ? 'Generated' : 'Failed'}');
+
+      // Update loading message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opening WhatsApp directly...'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+
+      // Create a payment reminder message
+      String paymentMessage = 'Dear ${customer.custName}, Please find your payment reminder attached. Total Amount Due: ${AmountFormatter.formatCurrency(totalDue)}. Please make the payment as soon as possible. Thank you!';
+
+      if (imageFile != null) {
+        // Send image directly to WhatsApp - opens WhatsApp with image and message ready to send
+        await WhatsAppHelper.sendImageDirectly(
+          imageFile: imageFile,
+          phoneNumber: customer.custPhn,
+          message: paymentMessage,
+        );
+      } else {
+        // Fallback to text-only message if image generation fails
+        await WhatsAppHelper.openWhatsAppDirectly(
+          phoneNumber: customer.custPhn,
+          message: paymentMessage,
+        );
+      }
+
+      // Show success message with new text
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('WhatsApp opened successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      // Show detailed error message to user
+      String errorMessage = 'Failed to send payment reminder';
+      if (e.toString().contains('not installed')) {
+        errorMessage = 'WhatsApp is not installed. Please install WhatsApp first.';
+      } else if (e.toString().contains('internet')) {
+        errorMessage = 'Please check your internet connection and try again.';
+      } else {
+        errorMessage = 'Failed to send payment reminder. Please try again or contact support.';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _sendWhatsAppPaymentReminder(customer, totals),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -90,9 +292,9 @@ class _LoandashboardState extends State<Loandashboard> {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Icon(icon, color: color, size: 20),
       ),
@@ -110,9 +312,9 @@ class _LoandashboardState extends State<Loandashboard> {
       margin: const EdgeInsets.only(right: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.1)),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -143,28 +345,101 @@ class _LoandashboardState extends State<Loandashboard> {
     );
   }
 
+  Widget _buildInterestSummaryCard(String title, dynamic totalInterest) {
+    final interestData = AmountFormatter.formatInterestWithAdvancePayment(totalInterest);
+
+    return Container(
+      width: 140, // Fixed width for horizontal scrolling
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: (interestData['color'] as Color).withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: (interestData['color'] as Color).withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            interestData['icon'] as IconData,
+            color: interestData['color'] as Color,
+            size: 28,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            interestData['amount'] as String,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: interestData['color'] as Color,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _generatePDF(customer) async {
     try {
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Generating PDF...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Get current totals from loan provider before async operations
+      final loanProvider = Provider.of<LoanProvider>(context, listen: false);
+      final totals = loanProvider.totals;
+
+      print('Fetching loan data for customer: ${customer.custName}');
       final data = await fetchAllLoansByUserAndCustomer(
         custId: int.parse(customer.custId.toString()),
         userId: int.parse(customer.userId.toString()),
       );
 
+      print('Loan data fetched, count: ${data.length}');
       await generatePdfForPerticulatCustomer(
         data: data,
         customerName: customer.custName,
+        totals: totals,
+        customerPhone: customer.custPhn,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF generated successfully!')),
+          const SnackBar(
+            content: Text('PDF generated successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
         );
       }
     } catch (e) {
+      print('PDF generation error: $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to generate PDF: $e')));
+        ).showSnackBar(SnackBar(
+          content: Text('Failed to generate PDF: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ));
       }
     }
   }
@@ -185,6 +460,14 @@ class _LoandashboardState extends State<Loandashboard> {
           context,
           listen: false,
         ).fetchLoanDetailList(userId, widget.custId);
+
+        // Also refresh the profile provider to update profile screen amounts
+        if (mounted) {
+          Provider.of<ProfileProvider>(
+            context,
+            listen: false,
+          ).fetchMoneyInfo();
+        }
       }
     }
   }
@@ -201,6 +484,13 @@ class _LoandashboardState extends State<Loandashboard> {
           title: const Text("Customer Not Found"),
           backgroundColor: Colors.blueGrey[700],
           foregroundColor: Colors.white,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              // Ensure safe navigation back to home
+              Navigator.of(context).pop();
+            },
+          ),
         ),
         body: Center(
           child: Column(
@@ -323,7 +613,7 @@ class _LoandashboardState extends State<Loandashboard> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   spreadRadius: 1,
                   blurRadius: 10,
                   offset: const Offset(0, 2),
@@ -390,17 +680,23 @@ class _LoandashboardState extends State<Loandashboard> {
                       onTap: () => _generatePDF(customer),
                     ),
                     const SizedBox(width: 12),
-                    _buildActionButton(
-                      icon: Icons.phone,
-                      color: Colors.green,
-                      onTap: () => _makePhoneCall(customer.custPhn),
+                    Consumer<LoanProvider>(
+                      builder: (context, loanProvider, child) {
+                        return _buildActionButton(
+                          icon: FontAwesomeIcons.whatsapp,
+                          color: Colors.green,
+                          onTap: () => _sendWhatsAppPaymentReminder(customer, loanProvider.totals),
+                        );
+                      },
                     ),
                     const SizedBox(width: 12),
-                    _buildActionButton(
-                      icon: Icons.message,
-                      color: Colors.blue,
-                      onTap: () {
-                        // Message functionality
+                    Consumer<LoanProvider>(
+                      builder: (context, loanProvider, child) {
+                        return _buildActionButton(
+                          icon: Icons.message,
+                          color: Colors.blue,
+                          onTap: () => _sendSMSMessage(customer, loanProvider.totals),
+                        );
                       },
                     ),
                   ],
@@ -424,11 +720,9 @@ class _LoandashboardState extends State<Loandashboard> {
                             Colors.red,
                             Icons.account_balance_wallet,
                           ),
-                          _buildSummaryCard(
+                          _buildInterestSummaryCard(
                             'Interest',
-                            AmountFormatter.formatCurrency(totals['totalInterest']),
-                            Colors.orange,
-                            Icons.trending_up,
+                            totals['totalInterest'],
                           ),
                           _buildSummaryCard(
                             'Total Due',

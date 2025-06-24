@@ -99,7 +99,7 @@ class _ContactListState extends State<ContactList> {
                 decoration: InputDecoration(
                   hintText: "Search Contacts..",
                   border: InputBorder.none,
-                  hintStyle: TextStyle(color: Colors.black.withOpacity(0.5)),
+                  hintStyle: TextStyle(color: Colors.black.withValues(alpha: 0.5)),
                 ),
                 cursorColor: Colors.black26,
                 style: const TextStyle(color: Colors.black),

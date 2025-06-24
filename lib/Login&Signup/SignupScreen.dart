@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:interest_book/Api/signup_api.dart';
 import 'package:interest_book/Login&Signup/LoginScreen.dart';
 
-import '../Api/SignupApi.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});

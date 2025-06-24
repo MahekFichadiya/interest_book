@@ -20,14 +20,14 @@ class Getloandetailforpdf {
   String? interestDetails;
 
   Getloandetailforpdf.fromJson(Map<String, dynamic> json) {
-    loanId = json['loanId'];
-    startDate = json['startDate'];
-    endDate = json['endDate'];
-    duration = json['duration'];
-    amount = json['amount'];
-    loanNote = json['loanNote'];
-    depositDetails = json['deposit_details'];
-    interestDetails = json['interest_details'];
+    loanId = int.tryParse(json['loanId']?.toString() ?? '0') ?? 0;
+    startDate = json['startDate']?.toString() ?? '';
+    endDate = json['endDate']?.toString();
+    duration = int.tryParse(json['duration']?.toString() ?? '0') ?? 0;
+    amount = int.tryParse(json['amount']?.toString() ?? '0') ?? 0;
+    loanNote = json['loanNote']?.toString();
+    depositDetails = json['deposit_details']?.toString();
+    interestDetails = json['interest_details']?.toString();
   }
 
   Map<String, dynamic> toJson() {

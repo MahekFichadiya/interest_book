@@ -168,7 +168,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.3),
+                                    color: Colors.black.withValues(alpha: 0.3),
                                     blurRadius: 25,
                                     spreadRadius: 5,
                                   ),
@@ -185,7 +185,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                 color: Colors.white,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: Colors.black.withValues(alpha: 0.2),
                                     blurRadius: 10,
                                     spreadRadius: 2,
                                   ),
@@ -220,9 +220,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             colors: [
-                                              Colors.white.withOpacity(0),
-                                              Colors.white.withOpacity(0.5),
-                                              Colors.white.withOpacity(0),
+                                              Colors.white.withValues(alpha: 0),
+                                              Colors.white.withValues(alpha: 0.5),
+                                              Colors.white.withValues(alpha: 0),
                                             ],
                                           ),
                                         ),
@@ -260,7 +260,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                   letterSpacing: 1.5,
                                   shadows: [
                                     Shadow(
-                                      color: Colors.black.withOpacity(0.3),
+                                      color: Colors.black.withValues(alpha: 0.3),
                                       offset: Offset(2, 2),
                                       blurRadius: 5,
                                     ),
@@ -285,7 +285,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               Text(
                                 "Interest Book",
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: Colors.white.withValues(alpha: 0.9),
                                   fontSize: 18,
                                   letterSpacing: 3,
                                   fontWeight: FontWeight.w300,

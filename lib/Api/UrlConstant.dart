@@ -1,7 +1,7 @@
 class UrlConstant{
-  static const String baseUrl = "http://192.168.11.15/OmJavellerssHTML/";
+  static const String baseUrl = "http://192.168.103.15/OmJavellerssHTML/";
 
-  static const String showImage = 'http://192.168.11.15';
+  static const String showImage = 'http://192.168.103.15';
   static const String LoginApi = '${baseUrl}LoginApi.php';
   static const String SignupApi = '${baseUrl}SignupApi.php';
   static const String FatchCustomer = '${baseUrl}FatchCustomer.php';
@@ -24,4 +24,5 @@ class UrlConstant{
   static const String getCustomerLoanData = '${baseUrl}getCustomerLoanData.php';
   static const String getLoanDetailForPDF = '${baseUrl}getLoanDetailForPDF.php';
   static const String updateCustomer = '${baseUrl}updateCustomer.php';
+  static const String getProfileMoneyInfo = '${baseUrl}getProfileMoneyInfo.php';
 }

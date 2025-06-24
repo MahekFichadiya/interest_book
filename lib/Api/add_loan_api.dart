@@ -1,8 +1,7 @@
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:interest_book/Api/UrlConstant.dart';
-
-import '../Provider/LoanProvider.dart';
+import 'package:interest_book/Provider/loan_provider.dart';
 
 class Addloanapi {
   Future<bool> newLoan(
