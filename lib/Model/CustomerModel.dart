@@ -3,6 +3,7 @@ class Customer {
   final String custName;
   final String custPhn;
   String? custAddress;
+  String? custPic;
   final String date;
   final String userId;
 
@@ -11,6 +12,7 @@ class Customer {
     required this.custName,
     required this.custPhn,
     this.custAddress,
+    this.custPic,
     required this.date,
     required this.userId,
   });
@@ -21,6 +23,7 @@ class Customer {
         custName: json['custName'] ?? '',
         custPhn: json['custPhn'] ?? '',
         custAddress: json['custAddress'] ?? '',
+        custPic: json['custPic'] ?? '',
         date: json['date'] ?? '',
         userId: json['userId'] ?? '');
   }
@@ -31,6 +34,7 @@ class Customer {
       'custName': custName,
       'custPhn': custPhn,
       'custAddress': custAddress,
+      'custPic': custPic,
       'date': date,
       'userId': userId,
     };

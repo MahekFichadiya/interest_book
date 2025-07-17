@@ -27,6 +27,7 @@ class _YouGotLoneState extends State<YouGotLone> {
   final formkey = GlobalKey<FormState>();
   String? userId = " ";
   String? custId = " ";
+  String _selectedPaymentMethod = 'cash'; // Default to cash
 
   loadData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -100,20 +101,40 @@ class _YouGotLoneState extends State<YouGotLone> {
     return "";
   }
 
-  //for the take picture
-  File? _image;
+  //for multiple documents
+  List<File> _documents = [];
 
   Future _pickImage(ImageSource source) async {
     try {
       final image = await ImagePicker().pickImage(source: source);
       if (image == null) return;
       setState(() {
-        _image = File(image.path);
+        _documents.add(File(image.path));
         Navigator.of(context).pop();
       });
     } on PlatformException {
       Navigator.of(context).pop();
     }
+  }
+
+  Future _pickMultipleImages() async {
+    try {
+      final List<XFile> images = await ImagePicker().pickMultipleMedia();
+      if (images.isEmpty) return;
+      setState(() {
+        for (var image in images) {
+          _documents.add(File(image.path));
+        }
+      });
+    } on PlatformException catch (e) {
+      print("Error picking multiple images: $e");
+    }
+  }
+
+  void _removeDocument(int index) {
+    setState(() {
+      _documents.removeAt(index);
+    });
   }
 
   void _showSelectPhotoOptions(BuildContext context) {
@@ -156,7 +177,7 @@ class _YouGotLoneState extends State<YouGotLone> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       label: Text("Amount"),
-                      prefixIcon: Icon(Icons.attach_money_rounded),
+                      prefixIcon: Icon(Icons.currency_rupee),
                     ),
                     validator: (value) {
                       if (value!.isEmpty) {
@@ -225,33 +246,98 @@ class _YouGotLoneState extends State<YouGotLone> {
                     },
                     onTap: () => _selectEndDate(context),
                   ),
-                  TextFormField(
-                    readOnly: true,
-                    decoration: InputDecoration(
-                      hintText:
-                          _image == null ? "Select Image" : "Change Image",
-                      prefixIcon: const Icon(Icons.camera_alt_outlined),
+                  // Documents selection section
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    onTap: () {
-                      _showSelectPhotoOptions(context);
-                    },
-                    validator: (_) {
-                      if (_image == null) {
-                        return "Please select an image";
-                      }
-                      return null;
-                    },
-                  ),
-                  _image == null
-                      ? const SizedBox(height: 0)
-                      : Container(
-                          padding: const EdgeInsets.only(top: 20, bottom: 10),
-                          child: Image.file(
-                            _image!,
-                            height: 300,
-                            width: 300,
-                          ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.attach_file),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Loan Documents (${_documents.length})',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _showSelectPhotoOptions(context),
+                                icon: const Icon(Icons.camera_alt),
+                                label: const Text('Add Single'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _pickMultipleImages,
+                                icon: const Icon(Icons.photo_library),
+                                label: const Text('Add Multiple'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_documents.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 100,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _documents.length,
+                              itemBuilder: (context, index) {
+                                return Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  child: Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.file(
+                                          _documents[index],
+                                          width: 80,
+                                          height: 80,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: GestureDetector(
+                                          onTap: () => _removeDocument(index),
+                                          child: Container(
+                                            decoration: const BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                   TextFormField(
                     controller: noteController,
                     keyboardType: TextInputType.text,
@@ -265,6 +351,90 @@ class _YouGotLoneState extends State<YouGotLone> {
                       }
                       return null;
                     },
+                  ),
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 16),
+                    width: double.infinity,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Payment Mode',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blueGrey,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Wrap(
+                            spacing: 12,
+                            alignment: WrapAlignment.start,
+                            children: [
+                            ChoiceChip(
+                              label: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.money,
+                                    size: 18,
+                                    color: _selectedPaymentMethod == 'cash'
+                                      ? Colors.white
+                                      : Colors.blueGrey[700],
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('Cash'),
+                                ],
+                              ),
+                              selected: _selectedPaymentMethod == 'cash',
+                              onSelected: (selected) {
+                                setState(() => _selectedPaymentMethod = 'cash');
+                              },
+                              selectedColor: Colors.blueGrey[700],
+                              labelStyle: TextStyle(
+                                color: _selectedPaymentMethod == 'cash'
+                                  ? Colors.white
+                                  : Colors.blueGrey[700],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            ChoiceChip(
+                              label: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.credit_card,
+                                    size: 18,
+                                    color: _selectedPaymentMethod == 'online'
+                                      ? Colors.white
+                                      : Colors.blueGrey[700],
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('Online'),
+                                ],
+                              ),
+                              selected: _selectedPaymentMethod == 'online',
+                              onSelected: (selected) {
+                                setState(() => _selectedPaymentMethod = 'online');
+                              },
+                              selectedColor: Colors.blueGrey[700],
+                              labelStyle: TextStyle(
+                                color: _selectedPaymentMethod == 'online'
+                                  ? Colors.white
+                                  : Colors.blueGrey[700],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ],
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.only(top: 20),
@@ -280,42 +450,43 @@ class _YouGotLoneState extends State<YouGotLone> {
                               getFormattedEndDateForMySQL(
                                   endDateController.text);
 
-                          print(amountController.text);
-                          print(rateController.text);
-                          print(formattedStartDate);
-                          print(getFormattedEndDateForMySQL(
-                              endDateController.text));
-                          print(_image);
-                          print(noteController.text);
-                          print(userId);
-                          print(custId);
-
                           try {
-                            var loan = await Addloanapi().newLoan(
+                            var result = await Addloanapi().newLoan(
                                 amountController.text,
                                 rateController.text,
                                 formattedStartDate,
                                 formattedEndDate,
-                                _image,
+                                _documents,
                                 noteController.text,
                                 '0',
                                 userId!,
                                 custId!,
+                                _selectedPaymentMethod,
                                 loanProvider);
-                            formkey.currentState!.reset();
-                            amountController.clear();
-                            rateController.clear();
-                            startDateController.clear();
-                            endDateController.clear();
-                            noteController.clear();
-                            if (loan) {
+
+                            if (result.success) {
+                              formkey.currentState!.reset();
+                              amountController.clear();
+                              rateController.clear();
+                              startDateController.clear();
+                              endDateController.clear();
+                              noteController.clear();
+                              _documents.clear();
+
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Loan Added...")),
+                                SnackBar(content: Text(result.message)),
                               );
                             } else {
+                              String errorMessage = result.message;
+                              if (result.errorCode == "CUSTOMER_NOT_FOUND") {
+                                errorMessage = "Customer not found. Please refresh and try again.";
+                              }
+
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text("Failed to add loan")),
+                                SnackBar(
+                                  content: Text(errorMessage),
+                                  backgroundColor: Colors.red,
+                                ),
                               );
                             }
 

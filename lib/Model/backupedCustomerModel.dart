@@ -4,15 +4,18 @@ class Backupedcustomermodel {
     required this.custName,
     required this.custPhn,
     required this.custAddress,
+    this.custPic,
     required this.date,
   });
   late final String custId;
   late final String custName;
   late final String custPhn;
   late final String custAddress;
+  final String? custPic;
   late final String date;
   
-  Backupedcustomermodel.fromJson(Map<String, dynamic> json){
+  Backupedcustomermodel.fromJson(Map<String, dynamic> json)
+      : custPic = json['custPic'] {
     custId = json['custId'];
     custName = json['custName'];
     custPhn = json['custPhn'];
@@ -21,12 +24,13 @@ class Backupedcustomermodel {
   }
 
   Map<String, dynamic> toJson() {
-    final _data = <String, dynamic>{};
-    _data['custId'] = custId;
-    _data['custName'] = custName;
-    _data['custPhn'] = custPhn;
-    _data['custAddress'] = custAddress;
-    _data['date'] = date;
-    return _data;
+    final data = <String, dynamic>{};
+    data['custId'] = custId;
+    data['custName'] = custName;
+    data['custPhn'] = custPhn;
+    data['custAddress'] = custAddress;
+    data['custPic'] = custPic;
+    data['date'] = date;
+    return data;
   }
 }

@@ -10,6 +10,7 @@ class interestApi {
     String interestDate,
     String interestNote,
     String loanId,
+    String interestField,
   ) async {
     final url = Uri.parse(UrlConstant.addInterest);
     final response = await http.post(
@@ -20,6 +21,7 @@ class interestApi {
         "interestDate": interestDate,
         "interestNote": interestNote,
         "loanId": loanId,
+        "interestField": interestField,
       }),
     );
 
@@ -76,6 +78,7 @@ class interestApi {
     String depositeDate,
     String depositeNote,
     String loanId,
+    String depositeField,
   ) async {
     final url = Uri.parse(UrlConstant.addDeposite);
     final response = await http.post(
@@ -86,6 +89,7 @@ class interestApi {
         "depositeDate": depositeDate,
         "depositeNote": depositeNote,
         "loanId": loanId,
+        "depositeField": depositeField,
       }),
     );
 

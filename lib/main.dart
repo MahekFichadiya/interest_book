@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:interest_book/Login&Signup/splashScreen.dart';
 import 'package:interest_book/Provider/backuped_customer_provider.dart';
 import 'package:interest_book/Provider/customer_provider.dart';
@@ -7,10 +8,22 @@ import 'package:interest_book/Provider/interest_provider.dart';
 import 'package:interest_book/Provider/loan_provider.dart';
 import 'package:interest_book/Provider/profile_provider.dart';
 import 'package:interest_book/Provider/settled_loan_provider.dart';
+import 'package:interest_book/Provider/reminder_provider.dart';
+import 'package:interest_book/Provider/notification_provider.dart';
+import 'package:interest_book/Services/reminder_scheduler.dart';
+import 'package:interest_book/Services/realtime_reminder_service.dart';
 import 'package:interest_book/Utils/app_colors.dart';
 import 'package:provider/provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize reminder scheduler
+  await ReminderScheduler().initialize();
+
+  // Start real-time reminder checking
+  RealtimeReminderService().startRealtimeChecking();
+
   runApp(const MyApp());
 }
 
@@ -41,6 +54,12 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (context) => Depositeprovider(),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => ReminderProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => NotificationProvider(),
         ),
       ],
       child: MaterialApp(
@@ -78,6 +97,11 @@ class MyApp extends StatelessWidget {
             foregroundColor: Colors.white,
             elevation: 2,
             shadowColor: AppColors.shadowMedium,
+            systemOverlayStyle: const SystemUiOverlayStyle(
+              statusBarColor: AppColors.primaryDark, // Darker theme color for status bar
+              statusBarIconBrightness: Brightness.light,
+              statusBarBrightness: Brightness.dark,
+            ),
             titleTextStyle: const TextStyle(
               color: Colors.white,
               fontSize: 20,

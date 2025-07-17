@@ -18,6 +18,10 @@ class ProfileMoneyApi {
           return {
             'you_gave': (data['you_gave'] ?? 0).toDouble(),
             'you_got': (data['you_got'] ?? 0).toDouble(),
+            'you_gave_interest': (data['you_gave_interest'] ?? 0).toDouble(),
+            'you_got_interest': (data['you_got_interest'] ?? 0).toDouble(),
+            'total_you_gave': (data['total_you_gave'] ?? 0).toDouble(),
+            'total_you_got': (data['total_you_got'] ?? 0).toDouble(),
           };
         } else {
           throw Exception(jsonResponse['message'] ?? 'Failed to fetch money info');

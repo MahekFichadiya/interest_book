@@ -44,6 +44,9 @@ Future<void> generatePdfFromData(List<Customerloandata> data, {
   String? userPhone,
   double? totalYouGave,
   double? totalYouGot,
+  double? totalYouGaveInterest,
+  double? totalYouGotInterest,
+  double? totalInterest,
 }) async {
   try {
     print('Starting Profile PDF generation');
@@ -56,16 +59,24 @@ Future<void> generatePdfFromData(List<Customerloandata> data, {
     // Calculate totals if not provided
     double calculatedYouGave = totalYouGave ?? 0;
     double calculatedYouGot = totalYouGot ?? 0;
+    double calculatedYouGaveInterest = totalYouGaveInterest ?? 0;
+    double calculatedYouGotInterest = totalYouGotInterest ?? 0;
+    double calculatedTotalInterest = totalInterest ?? 0;
     double netBalance = 0;
 
-    if (totalYouGave == null || totalYouGot == null) {
+    if (totalYouGave == null || totalYouGot == null || totalYouGaveInterest == null || totalYouGotInterest == null) {
       for (var customer in data) {
         calculatedYouGave += double.tryParse(customer.youGaveAmount) ?? 0;
         calculatedYouGot += double.tryParse(customer.youGotAmount) ?? 0;
+        calculatedYouGaveInterest += double.tryParse(customer.youGaveInterest) ?? 0;
+        calculatedYouGotInterest += double.tryParse(customer.youGotInterest) ?? 0;
       }
+      calculatedTotalInterest = calculatedYouGaveInterest + calculatedYouGotInterest;
     }
 
-    netBalance = calculatedYouGot - calculatedYouGave;
+    double totalCalculatedYouGave = calculatedYouGave + calculatedYouGaveInterest;
+    double totalCalculatedYouGot = calculatedYouGot + calculatedYouGotInterest;
+    netBalance = totalCalculatedYouGot - totalCalculatedYouGave;
 
     print('Calculated totals - You Gave: $calculatedYouGave, You Got: $calculatedYouGot, Net: $netBalance');
 
@@ -205,17 +216,109 @@ Future<void> generatePdfFromData(List<Customerloandata> data, {
 
               pw.SizedBox(height: 20),
 
+              // Business Summary Section
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(16),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.blue50,
+                  borderRadius: pw.BorderRadius.circular(8),
+                  border: pw.Border.all(color: PdfColors.blue200),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'Business Summary',
+                      style: pw.TextStyle(
+                        fontSize: 16,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blue800,
+                      ),
+                    ),
+                    pw.SizedBox(height: 12),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Expanded(
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text('Principal Amount You Gave:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                              pw.Text(_formatCurrency(calculatedYouGave), style: const pw.TextStyle(fontSize: 11)),
+                              pw.SizedBox(height: 4),
+                              pw.Text('Interest on You Gave:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                              pw.Text(_formatCurrency(calculatedYouGaveInterest), style: const pw.TextStyle(fontSize: 11)),
+                              pw.SizedBox(height: 4),
+                              pw.Text('Total You Gave:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.red)),
+                              pw.Text(_formatCurrency(totalCalculatedYouGave), style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.red)),
+                            ],
+                          ),
+                        ),
+                        pw.Expanded(
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text('Principal Amount You Got:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                              pw.Text(_formatCurrency(calculatedYouGot), style: const pw.TextStyle(fontSize: 11)),
+                              pw.SizedBox(height: 4),
+                              pw.Text('Interest on You Got:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                              pw.Text(_formatCurrency(calculatedYouGotInterest), style: const pw.TextStyle(fontSize: 11)),
+                              pw.SizedBox(height: 4),
+                              pw.Text('Total You Got:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.green)),
+                              pw.Text(_formatCurrency(totalCalculatedYouGot), style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.green)),
+                            ],
+                          ),
+                        ),
+                        pw.Expanded(
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text('Total Interest:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                              pw.Text(_formatCurrency(calculatedYouGaveInterest + calculatedYouGotInterest), style: const pw.TextStyle(fontSize: 11)),
+                              pw.SizedBox(height: 4),
+                              pw.Text('Net Balance:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                              pw.Text(
+                                _formatCurrency(netBalance.abs()),
+                                style: pw.TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: netBalance >= 0 ? PdfColors.green : PdfColors.red,
+                                ),
+                              ),
+                              pw.Text(
+                                netBalance >= 0 ? '(You will receive)' : '(You need to pay)',
+                                style: pw.TextStyle(
+                                  fontSize: 9,
+                                  color: netBalance >= 0 ? PdfColors.green : PdfColors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 20),
+
               // Customer Data Table
               if (data.isNotEmpty) ...[
                 pw.Table(
                   border: pw.TableBorder.all(color: PdfColors.grey400, width: 1),
                   columnWidths: {
-                    0: const pw.FixedColumnWidth(40),  // S.NO
+                    0: const pw.FixedColumnWidth(30),  // S.NO
                     1: const pw.FlexColumnWidth(2),    // CUSTOMER NAME
-                    2: const pw.FixedColumnWidth(80),  // DATE
-                    3: const pw.FixedColumnWidth(80),  // YOU GAVE
-                    4: const pw.FixedColumnWidth(80),  // YOU GOT
-                    5: const pw.FixedColumnWidth(80),  // BALANCE
+                    2: const pw.FixedColumnWidth(60),  // DATE
+                    3: const pw.FixedColumnWidth(60),  // PRINCIPAL GAVE
+                    4: const pw.FixedColumnWidth(60),  // PRINCIPAL GOT
+                    5: const pw.FixedColumnWidth(60),  // INTEREST GAVE
+                    6: const pw.FixedColumnWidth(60),  // INTEREST GOT
+                    7: const pw.FixedColumnWidth(60),  // TOTAL GAVE
+                    8: const pw.FixedColumnWidth(60),  // TOTAL GOT
+                    9: const pw.FixedColumnWidth(60),  // BALANCE
                   },
                   children: [
                     // Header Row
@@ -227,8 +330,12 @@ Future<void> generatePdfFromData(List<Customerloandata> data, {
                         _buildTableCell('S.NO', isHeader: true),
                         _buildTableCell('CUSTOMER NAME', isHeader: true),
                         _buildTableCell('DATE', isHeader: true),
-                        _buildTableCell('YOU GAVE', isHeader: true),
-                        _buildTableCell('YOU GOT', isHeader: true),
+                        _buildTableCell('PRINCIPAL\nGAVE', isHeader: true),
+                        _buildTableCell('PRINCIPAL\nGOT', isHeader: true),
+                        _buildTableCell('INTEREST\nGAVE', isHeader: true),
+                        _buildTableCell('INTEREST\nGOT', isHeader: true),
+                        _buildTableCell('TOTAL\nGAVE', isHeader: true),
+                        _buildTableCell('TOTAL\nGOT', isHeader: true),
                         _buildTableCell('BALANCE', isHeader: true),
                       ],
                     ),
@@ -237,9 +344,13 @@ Future<void> generatePdfFromData(List<Customerloandata> data, {
                       final index = entry.key;
                       final customer = entry.value;
 
-                      final youGave = double.tryParse(customer.youGaveAmount) ?? 0;
-                      final youGot = double.tryParse(customer.youGotAmount) ?? 0;
-                      final balance = youGot - youGave;
+                      final principalGave = double.tryParse(customer.youGaveAmount) ?? 0;
+                      final principalGot = double.tryParse(customer.youGotAmount) ?? 0;
+                      final interestGave = double.tryParse(customer.youGaveInterest) ?? 0;
+                      final interestGot = double.tryParse(customer.youGotInterest) ?? 0;
+                      final totalGave = double.tryParse(customer.totalYouGave) ?? 0;
+                      final totalGot = double.tryParse(customer.totalYouGot) ?? 0;
+                      final balance = double.tryParse(customer.balance) ?? 0;
 
                       return pw.TableRow(
                         decoration: pw.BoxDecoration(
@@ -249,12 +360,13 @@ Future<void> generatePdfFromData(List<Customerloandata> data, {
                           _buildTableCell('${index + 1}'),
                           _buildTableCell(customer.custName),
                           _buildTableCell(_formatDate(customer.date)),
-                          _buildTableCell(_formatCurrency(youGave)),
-                          _buildTableCell(_formatCurrency(youGot)),
-                          _buildTableCell(
-                            _formatCurrency(balance.abs()),
-                            // Note: We can't use color in table cells easily, so we'll use text indicators
-                          ),
+                          _buildTableCell(_formatCurrency(principalGave)),
+                          _buildTableCell(_formatCurrency(principalGot)),
+                          _buildTableCell(_formatCurrency(interestGave)),
+                          _buildTableCell(_formatCurrency(interestGot)),
+                          _buildTableCell(_formatCurrency(totalGave)),
+                          _buildTableCell(_formatCurrency(totalGot)),
+                          _buildTableCell(_formatCurrency(balance.abs())),
                         ],
                       );
                     }),

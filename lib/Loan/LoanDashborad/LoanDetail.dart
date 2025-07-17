@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../Model/CustomerModel.dart';
 import '../../Model/LoanDetail.dart';
+import '../../Provider/loan_provider.dart';
 import '../../Utils/amount_formatter.dart';
 import '../../Widgets/interest_amount_display.dart';
 import '../EntryDetails/entry_details_screen.dart';
@@ -112,9 +115,13 @@ class LoanDetailState extends State<LoanDetail> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
+          onTap: () async {
+            // Store context reference before async operations
+            final navigator = Navigator.of(context);
+            final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+            // Navigate to entry details
+            await navigator.push(
               MaterialPageRoute(
                 builder: (context) => EntryDetailsScreen(
                   loanDetail: widget.detail,
@@ -122,6 +129,27 @@ class LoanDetailState extends State<LoanDetail> {
                 ),
               ),
             );
+
+            // Refresh loan data when returning from entry details
+            if (mounted) {
+              try {
+                final prefs = await SharedPreferences.getInstance();
+                final userId = prefs.getString("userId");
+                if (userId != null && mounted) {
+                  final loanProvider = Provider.of<LoanProvider>(context, listen: false);
+                  await loanProvider.fetchLoanDetailListSimple(userId, widget.customer.custId);
+                }
+              } catch (e) {
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to refresh loan data: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            }
           },
           borderRadius: BorderRadius.circular(16),
           child: Padding(
@@ -181,6 +209,53 @@ class LoanDetailState extends State<LoanDetail> {
                         ),
 
                         const SizedBox(width: 12),
+
+                        // Loan Type Badge (You Gave/You Got)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: widget.detail.type == '1'
+                                ? [Colors.red.shade100, Colors.red.shade200]
+                                : [Colors.green.shade100, Colors.green.shade200],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: widget.detail.type == '1'
+                                ? Colors.red.shade300
+                                : Colors.green.shade300,
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                widget.detail.type == '1'
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
+                                size: 16,
+                                color: widget.detail.type == '1'
+                                  ? Colors.red.shade700
+                                  : Colors.green.shade700,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.detail.type == '1' ? 'You Gave' : 'You Got',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: widget.detail.type == '1'
+                                    ? Colors.red.shade700
+                                    : Colors.green.shade700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
 
                         // Duration Badge
                         Container(
@@ -267,6 +342,44 @@ class LoanDetailState extends State<LoanDetail> {
                                   fontSize: 13,
                                   color: Colors.blueGrey.shade600,
                                   fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                widget.detail.paymentMode == 'online'
+                                  ? Icons.credit_card
+                                  : Icons.money,
+                                color: Colors.blueGrey.shade500,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: widget.detail.paymentMode == 'online'
+                                    ? Colors.blue.shade50
+                                    : Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: widget.detail.paymentMode == 'online'
+                                      ? Colors.blue.shade200
+                                      : Colors.green.shade200,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  widget.detail.paymentMode == 'online' ? 'Online' : 'Cash',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: widget.detail.paymentMode == 'online'
+                                      ? Colors.blue.shade700
+                                      : Colors.green.shade700,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
@@ -394,11 +507,17 @@ class LoanDetailState extends State<LoanDetail> {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            InterestAmountDisplay(
-                              totalInterest: totalInterest,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              showIcon: true,
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                // Adjust font size based on available width
+                                double fontSize = constraints.maxWidth < 120 ? 14 : 16;
+                                return InterestAmountDisplay(
+                                  totalInterest: totalInterest,
+                                  fontSize: fontSize,
+                                  fontWeight: FontWeight.w800,
+                                  showIcon: true,
+                                );
+                              },
                             ),
                             const SizedBox(height: 4),
                             Text(

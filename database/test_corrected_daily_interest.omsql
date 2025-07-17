@@ -1,0 +1,103 @@
+-- Test Corrected Daily Interest Calculation
+-- This script tests the corrected logic for daily interest calculation
+-- Created: 2025-07-04
+
+-- TEST 1: Your actual Loan ID 78 case
+SELECT
+    'Loan ID 78 Test' as test_name,
+    '2025-05-19' as start_date,
+    '2025-07-04' as check_date,
+    DATEDIFF('2025-07-04', '2025-05-19') as total_days,
+    FLOOR(DATEDIFF('2025-07-04', '2025-05-19') / 30) as complete_months,
+    DATEDIFF('2025-07-04', '2025-05-19') - (FLOOR(DATEDIFF('2025-07-04', '2025-05-19') / 30) * 30) as raw_days_beyond,
+    CASE 
+        WHEN DATEDIFF('2025-07-04', '2025-05-19') <= 30 THEN 0
+        WHEN (DATEDIFF('2025-07-04', '2025-05-19') - (FLOOR(DATEDIFF('2025-07-04', '2025-05-19') / 30) * 30)) = 0 THEN 0
+        ELSE (DATEDIFF('2025-07-04', '2025-05-19') - (FLOOR(DATEDIFF('2025-07-04', '2025-05-19') / 30) * 30)) - 1
+    END as corrected_days_beyond,
+    'Should be 15 days (June 20 - July 4)' as expected_result;
+
+-- TEST 2: Edge cases
+SELECT 
+    'Edge Case: Exactly 30 days' as test_name,
+    30 as total_days,
+    CASE 
+        WHEN 30 <= 30 THEN 0
+        WHEN (30 - (FLOOR(30 / 30) * 30)) = 0 THEN 0
+        ELSE (30 - (FLOOR(30 / 30) * 30)) - 1
+    END as corrected_days_beyond,
+    'Should be 0 days' as expected_result
+
+UNION ALL
+
+SELECT 
+    'Edge Case: 31 days' as test_name,
+    31 as total_days,
+    CASE 
+        WHEN 31 <= 30 THEN 0
+        WHEN (31 - (FLOOR(31 / 30) * 30)) = 0 THEN 0
+        ELSE (31 - (FLOOR(31 / 30) * 30)) - 1
+    END as corrected_days_beyond,
+    'Should be 0 days (first day after monthly)' as expected_result
+
+UNION ALL
+
+SELECT 
+    'Edge Case: 32 days' as test_name,
+    32 as total_days,
+    CASE 
+        WHEN 32 <= 30 THEN 0
+        WHEN (32 - (FLOOR(32 / 30) * 30)) = 0 THEN 0
+        ELSE (32 - (FLOOR(32 / 30) * 30)) - 1
+    END as corrected_days_beyond,
+    'Should be 1 day (second day after monthly)' as expected_result;
+
+-- TEST 3: Check actual Loan ID 78 data
+SELECT 
+    'Current Loan ID 78 Data' as test_name,
+    loanId,
+    startDate,
+    CURDATE() as today,
+    DATEDIFF(CURDATE(), DATE(startDate)) as total_days,
+    FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) as complete_months,
+    DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30) as raw_days_beyond,
+    CASE 
+        WHEN DATEDIFF(CURDATE(), DATE(startDate)) <= 30 THEN 0
+        WHEN (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30)) = 0 THEN 0
+        ELSE (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30)) - 1
+    END as corrected_days_beyond,
+    dailyInterest,
+    totalDailyInterest as current_total_daily,
+    ROUND(dailyInterest * 
+        CASE 
+            WHEN DATEDIFF(CURDATE(), DATE(startDate)) <= 30 THEN 0
+            WHEN (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30)) = 0 THEN 0
+            ELSE (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30)) - 1
+        END, 2
+    ) as should_be_total_daily
+FROM loan 
+WHERE loanId = 78;
+
+-- APPLY THE CORRECTION to Loan ID 78
+UPDATE loan 
+SET totalDailyInterest = ROUND(
+    dailyInterest * 
+    CASE 
+        WHEN DATEDIFF(CURDATE(), DATE(startDate)) <= 30 THEN 0
+        WHEN (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30)) = 0 THEN 0
+        ELSE (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30)) - 1
+    END, 2
+)
+WHERE loanId = 78;
+
+-- VERIFY THE CORRECTION
+SELECT 
+    'After Correction' as status,
+    loanId,
+    startDate,
+    CURDATE() as today,
+    dailyInterest,
+    totalDailyInterest,
+    'June 20 - July 4 = 15 days' as calculation_period
+FROM loan 
+WHERE loanId = 78;

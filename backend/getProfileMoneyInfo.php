@@ -14,33 +14,41 @@ if (!$userId) {
 }
 
 try {
-    // Calculate total amounts based on loan type for the specific user
+    // Calculate total amounts and interest based on loan type for the specific user
     $stmt = $con->prepare("
-        SELECT 
+        SELECT
             SUM(CASE WHEN type = 1 THEN updatedAmount ELSE 0 END) AS you_gave_total,
-            SUM(CASE WHEN type = 0 THEN updatedAmount ELSE 0 END) AS you_got_total
-        FROM 
-            loan 
-        WHERE 
+            SUM(CASE WHEN type = 0 THEN updatedAmount ELSE 0 END) AS you_got_total,
+            SUM(CASE WHEN type = 1 THEN totalInterest ELSE 0 END) AS you_gave_interest,
+            SUM(CASE WHEN type = 0 THEN totalInterest ELSE 0 END) AS you_got_interest
+        FROM
+            loan
+        WHERE
             userId = ?
     ");
-    
+
     $stmt->bind_param("i", $userId);
     $stmt->execute();
     $result = $stmt->get_result();
     $data = $result->fetch_assoc();
-    
+
     // Ensure we have numeric values (handle null cases)
     $youGave = floatval($data['you_gave_total'] ?? 0);
     $youGot = floatval($data['you_got_total'] ?? 0);
-    
+    $youGaveInterest = floatval($data['you_gave_interest'] ?? 0);
+    $youGotInterest = floatval($data['you_got_interest'] ?? 0);
+
     // Return the result as JSON
     header('Content-Type: application/json');
     echo json_encode([
         "status" => "success",
         "data" => [
             "you_gave" => $youGave,
-            "you_got" => $youGot
+            "you_got" => $youGot,
+            "you_gave_interest" => $youGaveInterest,
+            "you_got_interest" => $youGotInterest,
+            "total_you_gave" => $youGave + $youGaveInterest,
+            "total_you_got" => $youGot + $youGotInterest
         ]
     ]);
     
@@ -53,4 +61,3 @@ try {
 }
 
 $con->close();
-?>

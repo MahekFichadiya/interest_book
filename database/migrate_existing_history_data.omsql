@@ -1,0 +1,188 @@
+-- Migrate Existing History Data
+-- This script handles existing historyloan records and their image data
+-- Created: 2025-07-04
+
+-- Step 1: Check current state
+SELECT 'Current State Analysis' as Status;
+
+-- Check if image column exists in historyloan table
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'image') > 0,
+    'SELECT
+        "History Loans" as TableName,
+        COUNT(*) as TotalRecords,
+        SUM(CASE WHEN image IS NOT NULL AND image != "" AND image != "null" THEN 1 ELSE 0 END) as RecordsWithImages,
+        SUM(CASE WHEN image IS NULL OR image = "" OR image = "null" THEN 1 ELSE 0 END) as RecordsWithoutImages
+     FROM historyloan',
+    'SELECT
+        "History Loans" as TableName,
+        COUNT(*) as TotalRecords,
+        0 as RecordsWithImages,
+        COUNT(*) as RecordsWithoutImages
+     FROM historyloan'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SELECT 
+    'Active Loan Documents' as TableName,
+    COUNT(*) as TotalDocuments,
+    COUNT(DISTINCT loanId) as LoansWithDocuments
+FROM loan_documents;
+
+SELECT 
+    'History Loan Documents' as TableName,
+    COUNT(*) as TotalDocuments,
+    COUNT(DISTINCT loanId) as LoansWithDocuments
+FROM history_loan_documents;
+
+-- Step 2: Migrate existing historyloan image data to history_loan_documents
+-- Only migrate records that don't already exist and if image column exists
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'image') > 0,
+    'INSERT INTO history_loan_documents (loanId, documentPath, archivedDate)
+     SELECT
+         hl.loanId,
+         hl.image as documentPath,
+         NOW() as archivedDate
+     FROM historyloan hl
+     WHERE hl.image IS NOT NULL
+       AND hl.image != ""
+       AND hl.image != "null"
+       AND hl.loanId NOT IN (
+         SELECT DISTINCT loanId
+         FROM history_loan_documents
+         WHERE loanId = hl.loanId
+       )',
+    'SELECT "Image column does not exist in historyloan table - skipping image migration" AS message'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Step 3: Handle orphaned loan_documents (documents for loans that no longer exist in loan table)
+-- These are likely from loans that were deleted before the new system was in place
+INSERT INTO history_loan_documents (loanId, documentPath, archivedDate)
+SELECT 
+    ld.loanId,
+    ld.documentPath,
+    NOW() as archivedDate
+FROM loan_documents ld
+WHERE ld.loanId NOT IN (
+    SELECT loanId FROM loan
+  )
+  AND ld.loanId NOT IN (
+    SELECT DISTINCT loanId FROM history_loan_documents
+  );
+
+-- Step 4: Clean up orphaned loan_documents
+DELETE FROM loan_documents 
+WHERE loanId NOT IN (
+    SELECT loanId FROM loan
+);
+
+-- Step 5: Update historyloan table to remove image field (if it still exists)
+-- Check if image column exists first
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'image') > 0,
+    'ALTER TABLE `historyloan` DROP COLUMN `image`',
+    'SELECT "Image column already removed from historyloan table" AS message'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Step 6: Add missing fields to historyloan if they don't exist
+-- Add custName field
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'custName') = 0,
+    'ALTER TABLE `historyloan` ADD COLUMN `custName` VARCHAR(100) DEFAULT "Unknown Customer" COMMENT "Customer name preserved from customer table"',
+    'SELECT "custName column already exists in historyloan table" AS message'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add paymentMode field
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'paymentMode') = 0,
+    'ALTER TABLE `historyloan` ADD COLUMN `paymentMode` VARCHAR(10) NOT NULL DEFAULT "cash" COMMENT "Payment method: cash or online"',
+    'SELECT "paymentMode column already exists in historyloan table" AS message'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Step 7: Update existing historyloan records with customer names where missing
+UPDATE historyloan h
+LEFT JOIN customer c ON h.custId = c.custId
+SET h.custName = COALESCE(c.custName, h.custName)
+WHERE h.custName IS NULL OR h.custName = '' OR h.custName = 'Unknown Customer';
+
+-- Also try to get names from historycustomer table
+UPDATE historyloan h
+LEFT JOIN historycustomer hc ON h.custId = hc.custId
+SET h.custName = COALESCE(hc.custName, h.custName)
+WHERE h.custName IS NULL OR h.custName = '' OR h.custName = 'Unknown Customer';
+
+-- Step 8: Update paymentMode for existing records
+UPDATE historyloan 
+SET paymentMode = 'cash' 
+WHERE paymentMode IS NULL OR paymentMode = '';
+
+-- Step 9: Show final state
+SELECT 'Migration Results' as Status;
+
+SELECT 
+    'History Loans After Migration' as TableName,
+    COUNT(*) as TotalRecords
+FROM historyloan;
+
+SELECT 
+    'History Loan Documents After Migration' as TableName,
+    COUNT(*) as TotalDocuments,
+    COUNT(DISTINCT loanId) as LoansWithDocuments
+FROM history_loan_documents;
+
+SELECT 
+    'Active Loan Documents After Cleanup' as TableName,
+    COUNT(*) as TotalDocuments,
+    COUNT(DISTINCT loanId) as LoansWithDocuments
+FROM loan_documents;
+
+-- Step 10: Show sample of migrated data
+SELECT 
+    'Sample History Loan Documents' as Report,
+    hld.loanId,
+    hld.documentPath,
+    hld.archivedDate,
+    hl.custName,
+    hl.amount
+FROM history_loan_documents hld
+LEFT JOIN historyloan hl ON hld.loanId = hl.loanId
+ORDER BY hld.archivedDate DESC
+LIMIT 10;
+
+-- Final message
+SELECT 'Existing history data migration completed successfully!' as Message;

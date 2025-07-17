@@ -135,4 +135,32 @@ class LoanProvider extends ChangeNotifier {
       return null;
     }
   }
+
+  // Clear all data and reset state
+  void clearData() {
+    _loanDetail = [];
+    _errorMessage = '';
+    _isLoading = false;
+    _totals = {
+      'totalAmount': 0.0,
+      'totalInterest': 0.0,
+      'totalDue': 0.0,
+    };
+    notifyListeners();
+  }
+
+  // Force refresh with loading state
+  Future<void> forceRefreshWithLoading(String? userId, String? custId) async {
+    clearData();
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await fetchLoanDetailList(userId, custId);
+    } catch (e) {
+      _errorMessage = 'Failed to refresh loan data: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 }

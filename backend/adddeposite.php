@@ -13,42 +13,43 @@ try {
     $depositeDate = $data->depositeDate;
     $depositeNote = $data->depositeNote;
     $loanId = $data->loanId;
+    $depositeField = $data->depositeField ?? 'cash';
 
     // Validate input
     if (empty($depositeAmount) || empty($loanId) || $depositeAmount <= 0) {
         throw new Exception("Invalid deposit amount or loan ID");
     }
 
-    // Insert deposit record
-    $depositeQuery = "INSERT INTO deposite (depositeAmount, depositeDate, depositeNote, loanId) VALUES (?, ?, ?, ?)";
-    $depositeStmt = mysqli_prepare($con, $depositeQuery);
-    mysqli_stmt_bind_param($depositeStmt, "dssi", $depositeAmount, $depositeDate, $depositeNote, $loanId);
+    // Validate depositeField
+    if (!in_array($depositeField, ['cash', 'online'])) {
+        $depositeField = 'cash'; // Default to cash if invalid value
+    }
+
+    // Check if depositeField column exists
+    $checkColumnQuery = "SHOW COLUMNS FROM deposite LIKE 'depositeField'";
+    $checkResult = mysqli_query($con, $checkColumnQuery);
+    $hasDepositeField = mysqli_num_rows($checkResult) > 0;
+
+    // Insert deposit record with appropriate query based on column existence
+    if ($hasDepositeField) {
+        // Use query with depositeField column (using correct column name: loanid instead of loanId)
+        $depositeQuery = "INSERT INTO deposite (depositeAmount, depositeDate, depositeNote, loanid, depositeField) VALUES (?, ?, ?, ?, ?)";
+        $depositeStmt = mysqli_prepare($con, $depositeQuery);
+        mysqli_stmt_bind_param($depositeStmt, "dssis", $depositeAmount, $depositeDate, $depositeNote, $loanId, $depositeField);
+    } else {
+        // Fallback query without depositeField column
+        $depositeQuery = "INSERT INTO deposite (depositeAmount, depositeDate, depositeNote, loanid) VALUES (?, ?, ?, ?)";
+        $depositeStmt = mysqli_prepare($con, $depositeQuery);
+        mysqli_stmt_bind_param($depositeStmt, "dssi", $depositeAmount, $depositeDate, $depositeNote, $loanId);
+    }
 
     if (!mysqli_stmt_execute($depositeStmt)) {
         throw new Exception("Failed to insert deposit: " . mysqli_error($con));
     }
 
-    // Update loan: deduct deposit from updatedAmount and recalculate interest
-    $updateLoanQuery = "UPDATE loan SET
-                        updatedAmount = GREATEST(0, updatedAmount - ?)
-                        WHERE loanId = ?";
-    $updateStmt = mysqli_prepare($con, $updateLoanQuery);
-    mysqli_stmt_bind_param($updateStmt, "di", $depositeAmount, $loanId);
-
-    if (!mysqli_stmt_execute($updateStmt)) {
-        throw new Exception("Failed to update loan amount: " . mysqli_error($con));
-    }
-
-    // Recalculate monthly interest based on new updatedAmount
-    $recalculateQuery = "UPDATE loan SET
-                         interest = ROUND((updatedAmount * rate) / 100, 2)
-                         WHERE loanId = ?";
-    $recalculateStmt = mysqli_prepare($con, $recalculateQuery);
-    mysqli_stmt_bind_param($recalculateStmt, "i", $loanId);
-
-    if (!mysqli_stmt_execute($recalculateStmt)) {
-        throw new Exception("Failed to recalculate interest: " . mysqli_error($con));
-    }
+    // Note: The database trigger 'update_loan_after_deposit_insert' will automatically
+    // update the loan's updatedAmount, totalDeposite, interest, and dailyInterest fields
+    // based on the total deposits. No manual update needed here to avoid double deduction.
 
     // Commit transaction
     mysqli_commit($con);

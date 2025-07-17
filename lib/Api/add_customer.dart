@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:interest_book/Api/UrlConstant.dart';
 import 'package:interest_book/Provider/customer_provider.dart';
@@ -6,29 +7,52 @@ import 'package:interest_book/Provider/customer_provider.dart';
 import '../Model/CustomerModel.dart';
 
 class Addcustomer {
-  Future<bool> add(
+  Future<Map<String, dynamic>> add(
     String custName,
     String custPhn,
     String custAddress,
     String date,
     String userId,
     CustomerProvider customerProvider,
+    {File? custPic}
   ) async {
-    final Url = Uri.parse(UrlConstant.AddCustomer);
-    var body = {
-      "custName": custName,
-      "custPhn": custPhn,
-      "custAddress": custAddress,
-      "date": date,
-      "userId": userId,
-    };
-    final newbody = json.encode(body);
+    final url = Uri.parse(UrlConstant.AddCustomer);
+    http.Response responce;
 
-    var responce = await http.post(
-      Url,
-      body: newbody,
-      headers: {'Content-Type': 'application/json'},
-    );
+    if (custPic != null) {
+      // Use multipart request for file upload
+      var request = http.MultipartRequest("POST", url);
+      request.fields['custName'] = custName;
+      request.fields['custPhn'] = custPhn;
+      request.fields['custAddress'] = custAddress;
+      request.fields['date'] = date;
+      request.fields['userId'] = userId;
+
+      if (await custPic.exists()) {
+        request.files.add(
+          await http.MultipartFile.fromPath("custPic", custPic.path),
+        );
+      }
+
+      var streamedResponse = await request.send();
+      responce = await http.Response.fromStream(streamedResponse);
+    } else {
+      // Use regular JSON request
+      var body = {
+        "custName": custName,
+        "custPhn": custPhn,
+        "custAddress": custAddress,
+        "date": date,
+        "userId": userId,
+      };
+      final newbody = json.encode(body);
+
+      responce = await http.post(
+        url,
+        body: newbody,
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
 
     print(responce.body);
     print(responce.statusCode);
@@ -51,18 +75,48 @@ class Addcustomer {
               userId: customerData['userId'].toString(),
             ),
           );
-          return true;
+          return {
+            'success': true,
+            'message': responseData['message'] ?? 'Customer added successfully'
+          };
         } else {
           print("Error: ${responseData['message']}");
-          return false;
+          return {
+            'success': false,
+            'message': responseData['message'] ?? 'Failed to add customer'
+          };
         }
       } catch (e) {
         print("Error parsing response: $e");
-        return false;
+        return {
+          'success': false,
+          'message': 'Error processing response'
+        };
+      }
+    } else if (responce.statusCode == 409) {
+      // Handle duplicate customer case
+      try {
+        var responseData = json.decode(responce.body);
+        var existingCustomer = responseData['existingCustomer'];
+        return {
+          'success': false,
+          'isDuplicate': true,
+          'message': responseData['message'] ?? 'Customer already exists',
+          'existingCustomer': existingCustomer
+        };
+      } catch (e) {
+        return {
+          'success': false,
+          'isDuplicate': true,
+          'message': 'Customer with this phone number already exists'
+        };
       }
     } else {
       print("HTTP Error: ${responce.statusCode}");
-      return false;
+      return {
+        'success': false,
+        'message': 'Network error occurred'
+      };
     }
   }
 }

@@ -167,7 +167,7 @@ class ImageGeneratorHelper {
         }
       }
     } catch (e) {
-      print('Error cleaning up temp images: $e');
+      // Silently handle cleanup errors
     }
   }
 }

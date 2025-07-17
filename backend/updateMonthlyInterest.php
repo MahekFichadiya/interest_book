@@ -57,10 +57,11 @@ try {
         $monthlyInterestRate = $loan['rate'] / 100;
         $monthlyInterest = round($remainingBalance * $monthlyInterestRate, 2);
         
-        // Update the monthly interest field
-        $updateQuery = "UPDATE loan SET interest = ? WHERE loanId = ?";
+        // Update the monthly interest and daily interest fields
+        $dailyInterest = round($monthlyInterest / 30, 2);
+        $updateQuery = "UPDATE loan SET interest = ?, dailyInterest = ? WHERE loanId = ?";
         $updateStmt = mysqli_prepare($con, $updateQuery);
-        mysqli_stmt_bind_param($updateStmt, "di", $monthlyInterest, $loan['loanId']);
+        mysqli_stmt_bind_param($updateStmt, "ddi", $monthlyInterest, $dailyInterest, $loan['loanId']);
         
         if (!mysqli_stmt_execute($updateStmt)) {
             throw new Exception("Failed to update monthly interest for loan ID " . $loan['loanId'] . ": " . mysqli_error($con));

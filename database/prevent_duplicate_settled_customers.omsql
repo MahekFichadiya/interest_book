@@ -1,0 +1,56 @@
+-- Prevent Duplicate Settled Customers
+-- This script updates the backupedCustomer trigger to prevent duplicate customers
+-- in the historycustomer table based on name and mobile number
+-- Created: 2025-07-05
+
+-- Step 1: Drop the existing trigger
+DROP TRIGGER IF EXISTS `backupedCustomer`;
+
+-- Step 2: Create the new trigger with duplicate prevention
+DELIMITER $$
+CREATE TRIGGER `backupedCustomer` AFTER DELETE ON `customer` FOR EACH ROW 
+BEGIN
+    DECLARE existing_count INT DEFAULT 0;
+    
+    -- Check if a customer with the same name and mobile number already exists in historycustomer
+    SELECT COUNT(*) INTO existing_count
+    FROM historycustomer 
+    WHERE custName = OLD.custName 
+    AND custPhn = OLD.custPhn 
+    AND userId = OLD.userId;
+    
+    -- Only insert if no duplicate exists
+    IF existing_count = 0 THEN
+        INSERT INTO historycustomer (custId, custName, custPhn, custAddress, custPic, date, userId)
+        VALUES (OLD.custId, OLD.custName, OLD.custPhn, OLD.custAddress, OLD.custPic, OLD.date, OLD.userId);
+    END IF;
+END$$
+DELIMITER ;
+
+-- Step 3: Clean up any existing duplicates in historycustomer table
+-- Keep only the most recent entry for each name+phone+userId combination
+DELETE h1 FROM historycustomer h1
+INNER JOIN historycustomer h2 
+WHERE h1.custName = h2.custName 
+AND h1.custPhn = h2.custPhn 
+AND h1.userId = h2.userId
+AND h1.custId < h2.custId;
+
+-- Step 4: Verify the changes
+SELECT 
+    COUNT(*) as total_settled_customers,
+    COUNT(DISTINCT CONCAT(custName, '-', custPhn, '-', userId)) as unique_name_phone_combinations,
+    COUNT(*) - COUNT(DISTINCT CONCAT(custName, '-', custPhn, '-', userId)) as duplicate_count
+FROM historycustomer;
+
+-- Step 5: Show any remaining potential duplicates (for verification)
+SELECT 
+    custName, 
+    custPhn, 
+    userId,
+    COUNT(*) as count,
+    GROUP_CONCAT(custId ORDER BY custId) as customer_ids
+FROM historycustomer 
+GROUP BY custName, custPhn, userId
+HAVING COUNT(*) > 1
+ORDER BY custName, custPhn;

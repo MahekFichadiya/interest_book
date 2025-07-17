@@ -1,0 +1,72 @@
+-- Fix CleanupLoanDocuments Procedure
+-- This script handles the procedure creation issue
+-- Created: 2025-07-04
+
+-- Step 1: Force drop the existing procedure
+-- Use a more explicit approach
+SET @sql = 'DROP PROCEDURE IF EXISTS CleanupLoanDocuments';
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Step 2: Verify the procedure is dropped
+SELECT 
+    'Procedure Check' as Status,
+    CASE 
+        WHEN COUNT(*) = 0 THEN 'Procedure successfully dropped'
+        ELSE 'Procedure still exists'
+    END as Result
+FROM INFORMATION_SCHEMA.ROUTINES 
+WHERE ROUTINE_SCHEMA = DATABASE() 
+AND ROUTINE_NAME = 'CleanupLoanDocuments';
+
+-- Step 3: Create the procedure with proper delimiter handling
+DELIMITER $$
+
+CREATE PROCEDURE `CleanupLoanDocuments`(IN loan_id INT)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    
+    START TRANSACTION;
+    
+    -- First, archive the documents
+    INSERT INTO `history_loan_documents` (`loanId`, `documentPath`, `archivedDate`)
+    SELECT loan_id, `documentPath`, NOW()
+    FROM `loan_documents` 
+    WHERE `loanId` = loan_id;
+    
+    -- Then delete the original documents
+    DELETE FROM `loan_documents` WHERE `loanId` = loan_id;
+    
+    COMMIT;
+END$$
+
+DELIMITER ;
+
+-- Step 4: Verify the procedure was created successfully
+SELECT 
+    'Procedure Creation' as Status,
+    CASE 
+        WHEN COUNT(*) > 0 THEN 'Procedure created successfully'
+        ELSE 'Procedure creation failed'
+    END as Result
+FROM INFORMATION_SCHEMA.ROUTINES 
+WHERE ROUTINE_SCHEMA = DATABASE() 
+AND ROUTINE_NAME = 'CleanupLoanDocuments';
+
+-- Step 5: Show procedure details
+SELECT 
+    ROUTINE_NAME as ProcedureName,
+    ROUTINE_TYPE as Type,
+    CREATED as CreatedDate,
+    LAST_ALTERED as LastModified
+FROM INFORMATION_SCHEMA.ROUTINES 
+WHERE ROUTINE_SCHEMA = DATABASE() 
+AND ROUTINE_NAME = 'CleanupLoanDocuments';
+
+-- Final message
+SELECT 'CleanupLoanDocuments procedure is now ready!' as Message;

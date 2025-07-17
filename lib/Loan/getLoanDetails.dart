@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:interest_book/Api/UrlConstant.dart';
 import 'package:interest_book/Api/remove_loan.dart';
+import 'package:interest_book/Api/loan_document_api.dart';
 import 'package:interest_book/DashboardScreen.dart';
 import 'package:interest_book/Loan/DepositeAmount/InterestDashboard.dart';
 import 'package:interest_book/Loan/EditLoan.dart';
 import 'package:interest_book/Model/CustomerModel.dart';
 import 'package:interest_book/Model/LoanDetail.dart';
+import 'package:interest_book/Model/LoanDocument.dart';
+import 'package:interest_book/Provider/customer_provider.dart';
+import 'package:interest_book/Widgets/enhanced_loan_deletion_dialog.dart';
+import 'package:interest_book/Widgets/loan_document_full_screen_viewer.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class GetLoanDetails extends StatefulWidget {
   final Loandetail? detail;
@@ -20,6 +27,148 @@ class GetLoanDetails extends StatefulWidget {
 }
 
 class _GetLoanDetailsState extends State<GetLoanDetails> {
+  List<LoanDocument> loanDocuments = [];
+  bool isLoadingDocuments = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLoanDocuments();
+  }
+
+  Future<void> _loadLoanDocuments() async {
+    if (widget.detail == null) return;
+
+    setState(() => isLoadingDocuments = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString("userId");
+
+      if (userId != null) {
+        final documents = await LoanDocumentApi().getLoanDocuments(
+          widget.detail!.loanId,
+          userId
+        );
+
+        if (mounted) {
+          setState(() {
+            loanDocuments = documents;
+            isLoadingDocuments = false;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error loading loan documents: $e");
+      if (mounted) {
+        setState(() {
+          isLoadingDocuments = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildDocumentsPreview() {
+    if (isLoadingDocuments) {
+      return const SizedBox(
+        width: 50,
+        height: 50,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+
+    if (loanDocuments.isEmpty) {
+      return const Icon(
+        Icons.folder_open_outlined,
+        size: 50,
+        color: Colors.grey,
+      );
+    }
+
+    if (loanDocuments.length == 1) {
+      return GestureDetector(
+        onTap: () => _showDocumentsScreen(),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            LoanDocumentApi.getDocumentUrl(loanDocuments[0].documentPath),
+            height: 50,
+            width: 50,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(
+                Icons.broken_image_outlined,
+                size: 50,
+                color: Colors.grey,
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    // Multiple documents - show stack
+    return GestureDetector(
+      onTap: () => _showDocumentsScreen(),
+      child: Stack(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                LoanDocumentApi.getDocumentUrl(loanDocuments[0].documentPath),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.folder_outlined,
+                    size: 30,
+                    color: Colors.grey,
+                  );
+                },
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${loanDocuments.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDocumentsScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => DocumentsViewScreen(
+          documents: loanDocuments,
+          loanDetail: widget.detail!,
+        ),
+      ),
+    );
+  }
+
   String monthDifference(String? sDate, String? eDate) {
     if (sDate == null || eDate == null || eDate == "0000-00-00") {
       return "N/A";
@@ -54,6 +203,105 @@ class _GetLoanDetailsState extends State<GetLoanDetails> {
 
   String formatAmount(double value) {
     return value.toInt().toString();
+  }
+
+  Future<void> _deleteLoanWithConfirmation(bool confirmCustomerDeletion) async {
+    try {
+      final result = await RemoveLoan().remove(
+        widget.detail!.loanId,
+        confirmCustomerDeletion: confirmCustomerDeletion,
+      );
+
+      if (!mounted) return;
+
+      if (result.success) {
+        // If customer was deleted, remove from customer provider
+        if (result.customerDeleted && result.customerId != null) {
+          Provider.of<CustomerProvider>(context, listen: false)
+              .removeCustomer(result.customerId!);
+        }
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.customerDeleted
+              ? 'Loan deleted and customer removed (no remaining loans)'
+              : 'Loan successfully deleted'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: result.customerDeleted ? 4 : 3),
+          ),
+        );
+
+        // Always navigate to dashboard (shows customer list) after loan deletion
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => const DashboardScreen(),
+          ),
+          (route) => false,
+        );
+      } else if (result.confirmationRequired) {
+        // Show enhanced confirmation dialog with three options
+        final choice = await EnhancedLoanDeletionDialog.show(
+          context: context,
+          customerName: widget.customer!.custName,
+        );
+
+        if (choice == LoanDeletionChoice.deleteBoth) {
+          // User wants to delete both loan and customer
+          await _deleteLoanWithConfirmation(true);
+        } else if (choice == LoanDeletionChoice.deleteLoanOnly) {
+          // User wants to delete loan only, keep customer
+          final result = await RemoveLoan().remove(
+            widget.detail!.loanId,
+            deleteLoanOnly: true,
+          );
+
+          if (mounted && result.success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result.message),
+                backgroundColor: Colors.green,
+              ),
+            );
+
+            // Navigate to dashboard
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => const DashboardScreen(),
+              ),
+              (route) => false,
+            );
+          }
+        } else {
+          // User cancelled, show message that loan was not deleted
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Loan deletion cancelled'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error deleting loan'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -93,13 +341,8 @@ class _GetLoanDetailsState extends State<GetLoanDetails> {
                     actions: [
                       TextButton(
                         onPressed: () async {
-                          await RemoveLoan().remove(widget.detail!.loanId);
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (context) => const DashboardScreen(),
-                            ),
-                            (route) => false,
-                          );
+                          Navigator.of(context).pop(); // Close the dialog first
+                          await _deleteLoanWithConfirmation(false);
                         },
                         child: const Text('Yes'),
                       ),
@@ -412,52 +655,13 @@ class _GetLoanDetailsState extends State<GetLoanDetails> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    "Image",
+                    "Documents",
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
-                  widget.detail!.image.isEmpty
-                      ? const Icon(Icons.image_not_supported,
-                          size: 50, color: Colors.grey)
-                      : GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    showImage(detail: widget.detail),
-                              ),
-                            );
-                            print(
-                                "${UrlConstant.baseUrl}${widget.detail!.image}");
-                            print(widget.detail!.image);
-                          },
-                          child: Image.network(
-                            "${UrlConstant.showImage}/${widget.detail!.image}",
-                            height: 50,
-                            width: 50,
-                            errorBuilder: (context, error, stackTrace) {
-                              // Show a placeholder with tooltip if image fails to load
-                              return Tooltip(
-                                message: "Image could not be loaded",
-                                child: Container(
-                                  height: 50,
-                                  width: 50,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade200,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Icon(
-                                    Icons.broken_image,
-                                    size: 30,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                  _buildDocumentsPreview(),
                 ],
               ),
             ),
@@ -503,61 +707,139 @@ class _GetLoanDetailsState extends State<GetLoanDetails> {
   }
 }
 
-class showImage extends StatelessWidget {
-  final Loandetail? detail;
-  const showImage({super.key, required this.detail});
+class DocumentsViewScreen extends StatelessWidget {
+  final List<LoanDocument> documents;
+  final Loandetail loanDetail;
+
+  const DocumentsViewScreen({
+    super.key,
+    required this.documents,
+    required this.loanDetail
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        title: Text('Loan Documents (${documents.length})'),
         automaticallyImplyLeading: false,
         leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
       ),
-      body: Center(
-        child: detail!.image.isEmpty
-            ? const Icon(Icons.image_not_supported,
-                size: 50, color: Colors.grey)
-            : GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => showImage(detail: detail),
+      body: documents.isEmpty
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.folder_open_outlined,
+                    size: 100,
+                    color: Colors.grey,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    "No documents available",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey,
                     ),
-                  );
-                  print("${UrlConstant.baseUrl}/${detail!.image}");
-                  print(detail!.image);
-                },
-                child: Image.network(
-                  "${UrlConstant.showImage}/${detail!.image}",
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                  ),
+                ],
+              ),
+            )
+          : GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.8,
+              ),
+              itemCount: documents.length,
+              itemBuilder: (context, index) {
+                final document = documents[index];
+                return GestureDetector(
+                  onTap: () => _showFullScreenDocument(context, document),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withValues(alpha: 0.2),
+                          spreadRadius: 2,
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Stack(
                         children: [
-                          Icon(
-                            Icons.broken_image,
-                            size: 100,
-                            color: Colors.red,
+                          Image.network(
+                            LoanDocumentApi.getDocumentUrl(document.documentPath),
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey[200],
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.broken_image_outlined,
+                                      size: 50,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'Failed to load',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
-                          Text(
-                            "Somthing went wrong...",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.zoom_in,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                             ),
-                          )
+                          ),
                         ],
                       ),
-                    );
-                  },
-                ),
-              ),
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+
+  void _showFullScreenDocument(BuildContext context, LoanDocument document) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => LoanDocumentFullScreenViewer(
+          document: document,
+        ),
       ),
     );
   }

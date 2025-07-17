@@ -21,7 +21,7 @@ class InterestAmountDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final interestData = AmountFormatter.formatInterestWithAdvancePayment(totalInterest);
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -33,41 +33,47 @@ class InterestAmountDisplay extends StatelessWidget {
           ),
           const SizedBox(width: 4),
         ],
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              interestData['amount'] as String,
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: fontWeight,
-                color: interestData['color'] as Color,
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                interestData['amount'] as String,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: fontWeight,
+                  color: interestData['color'] as Color,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
-            ),
-            if (showLabel && interestData['isAdvancePayment'] == true) ...[
-              const SizedBox(height: 2),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: interestData['lightColor'] as Color,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                    color: interestData['borderColor'] as Color,
-                    width: 1,
+              if (showLabel && interestData['isAdvancePayment'] == true) ...[
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: interestData['lightColor'] as Color,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: interestData['borderColor'] as Color,
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    'Advance Payment',
+                    style: TextStyle(
+                      fontSize: fontSize * 0.6,
+                      color: interestData['color'] as Color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
-                child: Text(
-                  'Advance Payment',
-                  style: TextStyle(
-                    fontSize: fontSize * 0.6,
-                    color: interestData['color'] as Color,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ],
     );
@@ -80,44 +86,59 @@ class InterestDetailRow extends StatelessWidget {
   final dynamic totalInterest;
 
   const InterestDetailRow({
-    Key? key,
+    super.key,
     required this.label,
     required this.totalInterest,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final interestData = AmountFormatter.formatInterestWithAdvancePayment(totalInterest);
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 16),
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 16),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (interestData['isAdvancePayment'] == true) ...[
-                Icon(
-                  Icons.trending_up,
-                  color: interestData['color'] as Color,
-                  size: 16,
+          const SizedBox(width: 8),
+          Flexible(
+            flex: 3,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (interestData['isAdvancePayment'] == true) ...[
+                  Icon(
+                    Icons.trending_up,
+                    color: interestData['color'] as Color,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Flexible(
+                  child: Text(
+                    interestData['amount'] as String,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: interestData['color'] as Color,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    textAlign: TextAlign.end,
+                  ),
                 ),
-                const SizedBox(width: 4),
               ],
-              Text(
-                interestData['amount'] as String,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: interestData['color'] as Color,
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -132,11 +153,11 @@ class InterestCardDisplay extends StatelessWidget {
   final double cardWidth;
 
   const InterestCardDisplay({
-    Key? key,
+    super.key,
     required this.totalInterest,
     this.title = 'Interest',
     this.cardWidth = 120,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

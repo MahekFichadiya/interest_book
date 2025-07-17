@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:interest_book/Provider/interest_provider.dart';
 import 'package:interest_book/Utils/amount_formatter.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 class showInterest extends StatefulWidget {
   final String amount;
@@ -24,6 +25,18 @@ class _showInterestState extends State<showInterest> {
   Future<void> fetchInterestData() async {
     await Provider.of<Interestprovider>(context, listen: false)
         .fetchInterestList(widget.loanId); // ✅ only loanId now
+  }
+
+  String _formatDisplayDate(String dateString) {
+    try {
+      // Parse the date from MySQL format (yyyy-MM-dd)
+      final DateTime parsedDate = DateTime.parse(dateString);
+      // Format to display format (dd/MM/yyyy)
+      return DateFormat("dd/MM/yyyy").format(parsedDate);
+    } catch (e) {
+      // If parsing fails, return the original string
+      return dateString;
+    }
   }
 
   @override
@@ -78,7 +91,7 @@ class _showInterestState extends State<showInterest> {
                       title:
                           Text(AmountFormatter.formatCurrencyWithDecimals(interestprovider.interest[index].interestAmount)),
                       subtitle:
-                          Text(interestprovider.interest[index].interestDate),
+                          Text(_formatDisplayDate(interestprovider.interest[index].interestDate)),
                       trailing:
                           Text(interestprovider.interest[index].interestNote),
                     ),

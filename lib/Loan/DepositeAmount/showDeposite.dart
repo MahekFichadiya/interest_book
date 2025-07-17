@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:interest_book/Provider/deposite_provider.dart';
 import 'package:interest_book/Utils/amount_formatter.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 class ShowDeposite extends StatefulWidget {
   final String amount;
@@ -33,6 +34,18 @@ class _ShowDepositeState extends State<ShowDeposite> {
     // Ensure data is refreshed when the page is loaded
     await Provider.of<Depositeprovider>(context, listen: false)
         .fetchDepositeList(widget.loanId);
+  }
+
+  String _formatDisplayDate(String dateString) {
+    try {
+      // Parse the date from MySQL format (yyyy-MM-dd)
+      final DateTime parsedDate = DateTime.parse(dateString);
+      // Format to display format (dd/MM/yyyy)
+      return DateFormat("dd/MM/yyyy").format(parsedDate);
+    } catch (e) {
+      // If parsing fails, return the original string
+      return dateString;
+    }
   }
 
   @override
@@ -69,7 +82,7 @@ class _ShowDepositeState extends State<ShowDeposite> {
                     title:
                         Text(AmountFormatter.formatCurrency(depositeprovider.deposite[index].depositeAmount)),
                     subtitle:
-                        Text(depositeprovider.deposite[index].depositeDate),
+                        Text(_formatDisplayDate(depositeprovider.deposite[index].depositeDate)),
                     trailing:
                         Text(depositeprovider.deposite[index].depositeNote),
                   ),

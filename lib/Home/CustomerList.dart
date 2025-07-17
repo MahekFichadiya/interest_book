@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanDashborad.dart';
 import 'package:interest_book/Provider/customer_provider.dart';
+import 'package:interest_book/Provider/reminder_provider.dart';
+import 'package:interest_book/Widgets/reminder_summary_card.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import '../Api/UrlConstant.dart';
 
 class CustomerList extends StatefulWidget {
   final ScrollController scrollController;
@@ -30,9 +33,14 @@ class _CustomerListState extends State<CustomerList> {
     final prefs = await SharedPreferences.getInstance();
     String? userId = prefs.getString("userId");
 
-    if (userId != null && userId.isNotEmpty) {
+    if (userId != null && userId.isNotEmpty && mounted) {
       await Provider.of<CustomerProvider>(context, listen: false)
           .fetchCustomerList(userId);
+      // Also load reminders
+      if (mounted) {
+        await Provider.of<ReminderProvider>(context, listen: false)
+            .loadReminders();
+      }
     }
   }
 
@@ -47,6 +55,23 @@ class _CustomerListState extends State<CustomerList> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final screenHeight = screenSize.height;
+    final screenWidth = screenSize.width;
+    final isSmallScreen = screenHeight < 700;
+    final isTablet = screenWidth > 600;
+
+    // Responsive dimensions
+    final avatarRadius = isSmallScreen ? 20.0 : 25.0;
+    final cardMargin = EdgeInsets.symmetric(
+      horizontal: isTablet ? 16 : 10,
+      vertical: isSmallScreen ? 4 : 6,
+    );
+    final titleFontSize = isSmallScreen ? 16.0 : 18.0;
+    final subtitleFontSize = isSmallScreen ? 12.0 : 14.0;
+    final emptyStateFontSize = isSmallScreen ? 16.0 : 20.0;
+    final emptyStateSubtitleFontSize = isSmallScreen ? 10.0 : 12.0;
+
     return Consumer<CustomerProvider>(
       builder: (context, customerProvider, child) {
         if (customerProvider.isLoading) {
@@ -60,18 +85,29 @@ class _CustomerListState extends State<CustomerList> {
 
         if (filtered.isEmpty) {
           return Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: EdgeInsets.all(isTablet ? 16.0 : 8.0),
             child: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     "No customer data available....",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: emptyStateFontSize,
+                      color: Colors.blueGrey[700],
+                    ),
+                    textAlign: TextAlign.center,
                   ),
+                  SizedBox(height: isSmallScreen ? 8 : 12),
                   Text(
                     "Add a new Customer, by tapping on the '📞' button.",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: emptyStateSubtitleFontSize,
+                      color: Colors.blueGrey[500],
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
@@ -81,9 +117,17 @@ class _CustomerListState extends State<CustomerList> {
 
         return ListView.builder(
           controller: widget.scrollController,
-          itemCount: filtered.length,
+          physics: const BouncingScrollPhysics(),
+          itemCount: filtered.length + 1, // +1 for reminder summary card
           itemBuilder: (context, index) {
-            final customer = filtered[index];
+            // Show reminder summary card as first item
+            if (index == 0) {
+              return const ReminderSummaryCard();
+            }
+
+            // Adjust index for customer list
+            final customerIndex = index - 1;
+            final customer = filtered[customerIndex];
             return GestureDetector(
               onTap: () {
                 Navigator.of(context).push(
@@ -93,10 +137,71 @@ class _CustomerListState extends State<CustomerList> {
                 );
               },
               child: Card(
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                margin: cardMargin,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: ListTile(
-                  title: Text(customer.custName),
-                  subtitle: Text(formatDate(customer.date)),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 20 : 16,
+                    vertical: isSmallScreen ? 8 : 12,
+                  ),
+                  leading: CircleAvatar(
+                    radius: avatarRadius,
+                    backgroundColor: Colors.blueGrey[300],
+                    child: customer.custPic != null && customer.custPic!.isNotEmpty
+                        ? ClipOval(
+                            child: Image.network(
+                              "${UrlConstant.showImage}/${customer.custPic}",
+                              width: avatarRadius * 2,
+                              height: avatarRadius * 2,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Text(
+                                  customer.custName.isNotEmpty
+                                      ? customer.custName[0].toUpperCase()
+                                      : '',
+                                  style: TextStyle(
+                                    fontSize: avatarRadius * 0.8,
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                );
+                              },
+                            ),
+                          )
+                        : Text(
+                            customer.custName.isNotEmpty
+                                ? customer.custName[0].toUpperCase()
+                                : '',
+                            style: TextStyle(
+                              fontSize: avatarRadius * 0.8,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                  title: Text(
+                    customer.custName,
+                    style: TextStyle(
+                      fontSize: titleFontSize,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.blueGrey[800],
+                    ),
+                  ),
+                  subtitle: Text(
+                    formatDate(customer.date),
+                    style: TextStyle(
+                      fontSize: subtitleFontSize,
+                      color: Colors.blueGrey[600],
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.arrow_forward_ios,
+                    size: isSmallScreen ? 16 : 18,
+                    color: Colors.blueGrey[400],
+                  ),
                 ),
               ),
             );

@@ -47,33 +47,112 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Calculate new monthly interest based on updated amount
             $newMonthlyInterest = round(($newUpdatedAmount * $rate) / 100, 2);
 
-            // Check if a new image was uploaded
-            if (isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
-                $image = $uploadDir . basename($_FILES['image']['name']);
-                if (!move_uploaded_file($_FILES['image']['tmp_name'], $uploadPath . basename($_FILES['image']['name']))) {
-                    throw new Exception("Failed to upload image");
-                }
+            // Recalculate totalInterest from scratch based on months elapsed since start date
+            $startDateTime = new DateTime($startDate);
+            $currentDateTime = new DateTime();
 
-                // Update with new image and recalculated fields
-                $stmt = $con->prepare("UPDATE loan SET amount = ?, rate = ?, startdate = ?, endDate = ?, image = ?, note = ?, userId = ?, custId = ?, updatedAmount = ?, totalDeposite = ?, interest = ? WHERE loanid = ?");
+            // Calculate months elapsed more accurately
+            $yearDiff = (int)$currentDateTime->format('Y') - (int)$startDateTime->format('Y');
+            $monthDiff = (int)$currentDateTime->format('m') - (int)$startDateTime->format('m');
+            $dayDiff = (int)$currentDateTime->format('d') - (int)$startDateTime->format('d');
 
-                if ($stmt == false) {
-                    throw new Exception("Prepare failed: " . $con->error);
-                }
+            // Calculate total months
+            $monthsElapsed = ($yearDiff * 12) + $monthDiff;
 
-                $stmt->bind_param("ssssssssiddi", $amount, $rate, $startDate, $endDate, $image, $note, $userId, $custId, $newUpdatedAmount, $totalDeposits, $newMonthlyInterest, $loanId);
-            } else {
-                // Update without changing the image but with recalculated fields
-                $stmt = $con->prepare("UPDATE loan SET amount = ?, rate = ?, startdate = ?, endDate = ?, note = ?, userId = ?, custId = ?, updatedAmount = ?, totalDeposite = ?, interest = ? WHERE loanid = ?");
-
-                if ($stmt == false) {
-                    throw new Exception("Prepare failed: " . $con->error);
-                }
-
-                $stmt->bind_param("sssssssiddi", $amount, $rate, $startDate, $endDate, $note, $userId, $custId, $newUpdatedAmount, $totalDeposits, $newMonthlyInterest, $loanId);
+            // If we haven't reached the same day of the month yet, subtract 1 month
+            if ($dayDiff < 0) {
+                $monthsElapsed--;
             }
 
+            // Ensure months elapsed is not negative
+            $monthsElapsed = max(0, $monthsElapsed);
+
+            // Calculate total interest that should have accumulated
+            $newTotalInterest = round($newMonthlyInterest * $monthsElapsed, 2);
+
+            // Debug logging (remove in production)
+            error_log("UpdateLoan Debug - Start Date: $startDate");
+            error_log("UpdateLoan Debug - Current Date: " . $currentDateTime->format('Y-m-d H:i:s'));
+            error_log("UpdateLoan Debug - Months Elapsed: $monthsElapsed");
+            error_log("UpdateLoan Debug - Monthly Interest: $newMonthlyInterest");
+            error_log("UpdateLoan Debug - Calculated Total Interest: $newTotalInterest");
+
+            // Get total interest payments made to subtract from accumulated interest
+            $interestPaymentsQuery = "SELECT COALESCE(SUM(interestAmount), 0) as totalInterestPaid FROM interest WHERE loanId = ?";
+            $interestStmt = $con->prepare($interestPaymentsQuery);
+            if (!$interestStmt) {
+                throw new Exception("Failed to prepare interest payments query: " . $con->error);
+            }
+            $interestStmt->bind_param("i", $loanId);
+            $interestStmt->execute();
+            $interestResult = $interestStmt->get_result();
+            $interestRow = $interestResult->fetch_assoc();
+            $totalInterestPaid = $interestRow['totalInterestPaid'];
+
+            // Final totalInterest = accumulated interest - payments made
+            $finalTotalInterest = max(0, $newTotalInterest - $totalInterestPaid);
+
+            // Calculate daily interest and total daily interest
+            $newDailyInterest = round($newMonthlyInterest / 30, 2);
+
+            // Calculate days passed since loan start
+            $daysPassed = max(0, $currentDateTime->diff($startDateTime)->days);
+
+            // Calculate total daily interest (only for days beyond monthly periods)
+            // Daily interest starts from the day AFTER the monthly period ends
+            if ($daysPassed <= 30) {
+                $newTotalDailyInterest = 0; // No daily interest accumulation until after 30 days
+            } else {
+                $completeMonths = floor($daysPassed / 30);
+                $daysBeyondMonthly = $daysPassed - ($completeMonths * 30);
+                $newTotalDailyInterest = round($newDailyInterest * $daysBeyondMonthly, 2);
+            }
+
+            // Handle multiple documents upload if provided
+            $uploadedDocuments = [];
+            if (isset($_FILES['documents'])) {
+                $fileCount = count($_FILES['documents']['name']);
+
+                for ($i = 0; $i < $fileCount; $i++) {
+                    if ($_FILES['documents']['error'][$i] == 0) {
+                        $fileName = basename($_FILES['documents']['name'][$i]);
+                        $targetFilePath = $uploadPath . $fileName;
+                        $documentPath = $uploadDir . $fileName;
+
+                        // Check if document already exists in the folder
+                        if (file_exists($targetFilePath)) {
+                            // Document already exists, just use the existing path
+                            $uploadedDocuments[] = $documentPath;
+                        } else {
+                            // Document doesn't exist, save the new document
+                            if (move_uploaded_file($_FILES['documents']['tmp_name'][$i], $targetFilePath)) {
+                                $uploadedDocuments[] = $documentPath;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Update loan without image field but with recalculated fields including totalInterest, dailyInterest, and totalDailyInterest
+            $stmt = $con->prepare("UPDATE loan SET amount = ?, rate = ?, startdate = ?, endDate = ?, note = ?, userId = ?, custId = ?, updatedAmount = ?, totalDeposite = ?, interest = ?, totalInterest = ?, dailyInterest = ?, totalDailyInterest = ?, lastInterestUpdatedAt = CURDATE() WHERE loanid = ?");
+
+            if ($stmt == false) {
+                throw new Exception("Prepare failed: " . $con->error);
+            }
+
+            $stmt->bind_param("sssssssiddddi", $amount, $rate, $startDate, $endDate, $note, $userId, $custId, $newUpdatedAmount, $totalDeposits, $newMonthlyInterest, $finalTotalInterest, $newDailyInterest, $newTotalDailyInterest, $loanId);
+
             if ($stmt->execute()) {
+                // Insert new documents into loan_documents table if any were uploaded
+                if (!empty($uploadedDocuments)) {
+                    $docStmt = $con->prepare("INSERT INTO loan_documents (loanId, documentPath) VALUES (?, ?)");
+                    foreach ($uploadedDocuments as $documentPath) {
+                        $docStmt->bind_param("is", $loanId, $documentPath);
+                        $docStmt->execute();
+                    }
+                    $docStmt->close();
+                }
+
                 // Commit transaction
                 $con->commit();
                 http_response_code(200);
@@ -82,7 +161,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     "message" => "Record updated successfully",
                     "updatedAmount" => $newUpdatedAmount,
                     "totalDeposits" => $totalDeposits,
-                    "newMonthlyInterest" => $newMonthlyInterest
+                    "newMonthlyInterest" => $newMonthlyInterest,
+                    "newTotalInterest" => $finalTotalInterest,
+                    "newDailyInterest" => $newDailyInterest,
+                    "newTotalDailyInterest" => $newTotalDailyInterest,
+                    "monthsElapsed" => $monthsElapsed,
+                    "daysPassed" => $daysPassed,
+                    "totalInterestPaid" => $totalInterestPaid,
+                    "documentsAdded" => count($uploadedDocuments)
                 ]);
             } else {
                 throw new Exception("Database update failed: " . $stmt->error);
@@ -90,6 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             $stmt->close();
             $depositStmt->close();
+            $interestStmt->close();
 
         } catch (Exception $e) {
             // Rollback transaction on error

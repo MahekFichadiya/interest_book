@@ -61,7 +61,7 @@ class _DepositeCapitalAmountState extends State<DepositeCapitalAmount> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       label: Text("Amount"),
-                      prefixIcon: Icon(Icons.attach_money_rounded),
+                      prefixIcon: Icon(Icons.currency_rupee),
                     ),
                     onChanged: (value) {
                       if (value.isNotEmpty) {
@@ -133,6 +133,7 @@ class _DepositeCapitalAmountState extends State<DepositeCapitalAmount> {
                       formattedStartDate,
                       notecontroller.text,
                       widget.loanId.toString(),
+                      'cash', // Default to cash for this legacy call
                     );
                     formkey.currentState!.reset();
 

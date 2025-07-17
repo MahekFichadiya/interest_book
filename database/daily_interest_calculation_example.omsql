@@ -1,0 +1,96 @@
+-- Daily Interest Calculation Example
+-- This shows how the new calculation method works
+-- Created: 2025-07-04
+
+-- Example Loan Details:
+-- Loan Amount: ₹100,000
+-- Interest Rate: 2% per month
+-- Start Date: June 1, 2025
+
+-- CALCULATION BREAKDOWN:
+
+-- 1. MONTHLY INTEREST CALCULATION:
+--    Monthly Interest = (₹100,000 × 2%) / 100 = ₹2,000 per month
+--    Daily Interest = ₹2,000 / 30 = ₹66.67 per day
+
+-- 2. TIMELINE EXAMPLE:
+
+-- June 1 to July 1 (30 days) - MONTHLY CALCULATION PERIOD
+-- - totalInterest increases by ₹2,000 (handled by monthly interest system)
+-- - totalDailyInterest = 0 (no daily accumulation during monthly period)
+
+-- July 2 (Day 31) - DAILY CALCULATION STARTS
+-- - totalDailyInterest = ₹66.67 × 1 day = ₹66.67
+
+-- July 3 (Day 32)
+-- - totalDailyInterest = ₹66.67 × 2 days = ₹133.34
+
+-- July 4 (Day 33)
+-- - totalDailyInterest = ₹66.67 × 3 days = ₹200.01
+
+-- July 31 (Day 60) - END OF SECOND MONTH
+-- - Days beyond monthly = 60 - (2 × 30) = 0 days
+-- - totalDailyInterest resets to 0
+-- - totalInterest increases by another ₹2,000
+
+-- August 1 (Day 61) - NEW DAILY CYCLE STARTS
+-- - totalDailyInterest = ₹66.67 × 1 day = ₹66.67
+
+-- FORMULA EXPLANATION:
+
+-- total_days_passed = DATEDIFF(current_date, loan_start_date)
+-- complete_months = FLOOR(total_days_passed / 30)
+-- days_beyond_monthly = total_days_passed - (complete_months × 30)
+-- totalDailyInterest = daily_interest × days_beyond_monthly
+
+-- EXAMPLE CALCULATIONS FOR DIFFERENT DATES:
+
+-- Date: June 15 (Day 15)
+-- complete_months = FLOOR(15 / 30) = 0
+-- days_beyond_monthly = 15 - (0 × 30) = 15
+-- totalDailyInterest = ₹66.67 × 15 = ₹1,000.05
+
+-- Date: July 15 (Day 45)
+-- complete_months = FLOOR(45 / 30) = 1
+-- days_beyond_monthly = 45 - (1 × 30) = 15
+-- totalDailyInterest = ₹66.67 × 15 = ₹1,000.05
+
+-- Date: August 15 (Day 75)
+-- complete_months = FLOOR(75 / 30) = 2
+-- days_beyond_monthly = 75 - (2 × 30) = 15
+-- totalDailyInterest = ₹66.67 × 15 = ₹1,000.05
+
+-- VERIFICATION QUERY:
+-- You can test this calculation with:
+
+SELECT 
+    loanId,
+    amount,
+    rate,
+    startDate,
+    DATEDIFF(CURDATE(), DATE(startDate)) as total_days,
+    FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) as complete_months,
+    DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30) as days_beyond_monthly,
+    ROUND((updatedAmount * rate) / 100, 2) as monthly_interest,
+    ROUND((updatedAmount * rate) / 100 / 30, 2) as daily_interest,
+    ROUND(
+        (ROUND((updatedAmount * rate) / 100 / 30, 2)) * 
+        (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30))
+    , 2) as calculated_total_daily_interest,
+    totalDailyInterest as current_total_daily_interest
+FROM loan 
+WHERE updatedAmount > 0
+ORDER BY startDate;
+
+-- DAILY EVENT LOGIC:
+-- The daily event only adds dailyInterest when:
+-- 1. Loan is active (no end date or end date > current date)
+-- 2. updatedAmount > 0
+-- 3. dailyInterest > 0
+-- 4. We are beyond a monthly calculation period
+--    (DATEDIFF(CURDATE(), DATE(startDate)) > (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30))
+
+-- This ensures that:
+-- - Monthly periods are handled by the monthly interest system
+-- - Daily accumulation only happens for partial months
+-- - No double counting of interest occurs

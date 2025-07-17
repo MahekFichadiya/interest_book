@@ -18,8 +18,12 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `omsql`
+-- Database: `om`
 --
+
+-- Create database if it doesn't exist
+CREATE DATABASE IF NOT EXISTS `om` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `om`;
 
 -- --------------------------------------------------------
 
@@ -32,6 +36,7 @@ CREATE TABLE `customer` (
   `custName` varchar(20) NOT NULL,
   `custPhn` varchar(15) NOT NULL,
   `custAddress` varchar(50) DEFAULT NULL,
+  `custPic` varchar(255) DEFAULT NULL,
   `date` datetime NOT NULL,
   `userId` int(5) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -65,8 +70,8 @@ INSERT INTO `customer` (`custId`, `custName`, `custPhn`, `custAddress`, `date`, 
 --
 DELIMITER $$
 CREATE TRIGGER `backupedCustomer` AFTER DELETE ON `customer` FOR EACH ROW BEGIN
-    INSERT INTO historycustomer (custId, custName, custPhn, custAddress, date, userId)
-    VALUES (OLD.custId, OLD.custName, OLD.custPhn, OLD.custAddress, OLD.date, OLD.userId);
+    INSERT INTO historycustomer (custId, custName, custPhn, custAddress, custPic, date, userId)
+    VALUES (OLD.custId, OLD.custName, OLD.custPhn, OLD.custAddress, OLD.custPic, OLD.date, OLD.userId);
 END
 $$
 DELIMITER ;
@@ -237,6 +242,7 @@ CREATE TABLE `historycustomer` (
   `custName` varchar(20) NOT NULL,
   `custPhn` varchar(15) NOT NULL,
   `custAddress` varchar(100) NOT NULL,
+  `custPic` varchar(255) DEFAULT NULL,
   `date` datetime NOT NULL,
   `userId` int(5) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -502,7 +508,7 @@ CREATE TABLE `user` (
   `name` varchar(20) NOT NULL,
   `mobileNo` varchar(15) NOT NULL,
   `email` varchar(50) NOT NULL,
-  `password` varchar(8) NOT NULL
+  `password` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -564,7 +570,9 @@ ALTER TABLE `loan`
 -- Indexes for table `user`
 --
 ALTER TABLE `user`
-  ADD PRIMARY KEY (`userId`);
+  ADD PRIMARY KEY (`userId`),
+  ADD UNIQUE KEY `unique_email` (`email`),
+  ADD UNIQUE KEY `unique_mobile` (`mobileNo`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -714,6 +722,533 @@ CREATE DEFINER=`root`@`localhost` EVENT `calculate_totalinterest_monthly` ON SCH
 END$$
 
 DELIMITER ;
+
+-- ========================================
+-- MIGRATION SCRIPTS SECTION
+-- ========================================
+-- This section contains all migration scripts to update existing databases
+-- These scripts are safe to run multiple times and will check for existing structures
+
+-- ----------------------------------------
+-- Migration 1: Add Customer Picture Field
+-- ----------------------------------------
+-- Add custPic field to customer table (only if it doesn't exist)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'customer'
+     AND COLUMN_NAME = 'custPic') = 0,
+    'ALTER TABLE `customer` ADD COLUMN `custPic` varchar(255) DEFAULT NULL AFTER `custAddress`',
+    'SELECT "Column custPic already exists in customer table" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add custPic field to historycustomer table (only if it doesn't exist)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historycustomer'
+     AND COLUMN_NAME = 'custPic') = 0,
+    'ALTER TABLE `historycustomer` ADD COLUMN `custPic` varchar(255) DEFAULT NULL AFTER `custAddress`',
+    'SELECT "Column custPic already exists in historycustomer table" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ----------------------------------------
+-- Migration 2: Create OTP Verification Table
+-- ----------------------------------------
+-- Create the otp_verification table
+CREATE TABLE IF NOT EXISTS `otp_verification` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `email` varchar(255) NOT NULL,
+  `otp_code` varchar(6) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `is_used` tinyint(1) NOT NULL DEFAULT 0,
+  `attempts` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_email` (`email`),
+  KEY `idx_otp_code` (`otp_code`),
+  KEY `idx_expires_at` (`expires_at`),
+  KEY `idx_email_otp` (`email`, `otp_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ----------------------------------------
+-- Migration 3: Create Loan Documents Table
+-- ----------------------------------------
+-- Create loan_documents table for multiple document support
+CREATE TABLE IF NOT EXISTS `loan_documents` (
+  `documentId` int(11) NOT NULL AUTO_INCREMENT,
+  `loanId` int(5) NOT NULL,
+  `documentPath` varchar(255) NOT NULL,
+  PRIMARY KEY (`documentId`),
+  KEY `fk_loan_documents_loan` (`loanId`),
+  CONSTRAINT `fk_loan_documents_loan` FOREIGN KEY (`loanId`) REFERENCES `loan` (`loanId`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ----------------------------------------
+-- Migration 4: Add Payment Mode Fields
+-- ----------------------------------------
+-- Add paymentMode field to deposite table (only if it doesn't exist)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'deposite'
+     AND COLUMN_NAME = 'paymentMode') = 0,
+    'ALTER TABLE `deposite` ADD COLUMN `paymentMode` varchar(20) DEFAULT ''cash'' AFTER `depositeNote`',
+    'SELECT "Column paymentMode already exists in deposite table" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add paymentMode field to interest table (only if it doesn't exist)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'interest'
+     AND COLUMN_NAME = 'paymentMode') = 0,
+    'ALTER TABLE `interest` ADD COLUMN `paymentMode` varchar(20) DEFAULT ''cash'' AFTER `interestNote`',
+    'SELECT "Column paymentMode already exists in interest table" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add paymentMode field to loan table (only if it doesn't exist)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'loan'
+     AND COLUMN_NAME = 'paymentMode') = 0,
+    'ALTER TABLE `loan` ADD COLUMN `paymentMode` varchar(20) DEFAULT ''cash'' AFTER `note`',
+    'SELECT "Column paymentMode already exists in loan table" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ----------------------------------------
+-- Migration 5: Add Foreign Key Constraints with Cascading Deletion
+-- ----------------------------------------
+-- Add foreign key constraint for loan -> customer relationship (if not exists)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'loan'
+     AND CONSTRAINT_NAME = 'fk_loan_customer_cascade') = 0,
+    'ALTER TABLE `loan` ADD CONSTRAINT `fk_loan_customer_cascade` FOREIGN KEY (`custId`) REFERENCES `customer`(`custId`) ON DELETE CASCADE ON UPDATE CASCADE',
+    'SELECT "Foreign key fk_loan_customer_cascade already exists" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add foreign key constraint for interest -> loan relationship (if not exists)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'interest'
+     AND CONSTRAINT_NAME = 'fk_interest_loan_cascade') = 0,
+    'ALTER TABLE `interest` ADD CONSTRAINT `fk_interest_loan_cascade` FOREIGN KEY (`loanId`) REFERENCES `loan`(`loanId`) ON DELETE CASCADE ON UPDATE CASCADE',
+    'SELECT "Foreign key fk_interest_loan_cascade already exists" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add foreign key constraint for deposite -> loan relationship (if not exists)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'deposite'
+     AND CONSTRAINT_NAME = 'fk_deposite_loan_cascade') = 0,
+    'ALTER TABLE `deposite` ADD CONSTRAINT `fk_deposite_loan_cascade` FOREIGN KEY (`loanid`) REFERENCES `loan`(`loanId`) ON DELETE CASCADE ON UPDATE CASCADE',
+    'SELECT "Foreign key fk_deposite_loan_cascade already exists" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add foreign key constraint for customer -> user relationship (if not exists)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'customer'
+     AND CONSTRAINT_NAME = 'fk_customer_user_cascade') = 0,
+    'ALTER TABLE `customer` ADD CONSTRAINT `fk_customer_user_cascade` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE CASCADE ON UPDATE CASCADE',
+    'SELECT "Foreign key fk_customer_user_cascade already exists" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ----------------------------------------
+-- Migration 6: Add User Unique Constraints
+-- ----------------------------------------
+-- Add unique constraint for email (if not exists)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'user'
+     AND INDEX_NAME = 'unique_email') = 0,
+    'ALTER TABLE `user` ADD UNIQUE KEY `unique_email` (`email`)',
+    'SELECT "Unique constraint unique_email already exists" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add unique constraint for mobile number (if not exists)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'user'
+     AND INDEX_NAME = 'unique_mobile') = 0,
+    'ALTER TABLE `user` ADD UNIQUE KEY `unique_mobile` (`mobileNo`)',
+    'SELECT "Unique constraint unique_mobile already exists" AS message'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ----------------------------------------
+-- Migration 7: Create Cleanup Events
+-- ----------------------------------------
+-- Add a cleanup event to automatically delete expired OTP records
+DELIMITER $$
+CREATE EVENT IF NOT EXISTS `cleanup_expired_otp`
+ON SCHEDULE EVERY 1 HOUR
+STARTS CURRENT_TIMESTAMP
+ON COMPLETION PRESERVE
+ENABLE
+DO
+BEGIN
+    DELETE FROM otp_verification
+    WHERE created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR);
+END$$
+DELIMITER ;
+
+-- Event to automatically delete settled loans after 30 days
+DELIMITER $$
+CREATE EVENT IF NOT EXISTS `auto_delete_settled_loans`
+ON SCHEDULE EVERY 1 DAY
+STARTS CURRENT_TIMESTAMP
+ON COMPLETION PRESERVE
+ENABLE
+DO
+BEGIN
+    -- Move loans to history that have been settled for 30+ days
+    INSERT INTO historyloan (loanId, amount, rate, startDate, endDate, image, note, updatedAmount, type, userId, custId)
+    SELECT loanId, amount, rate, startDate, endDate, image, note, updatedAmount, type, userId, custId
+    FROM loan
+    WHERE updatedAmount = 0
+    AND endDate IS NOT NULL
+    AND endDate < DATE_SUB(CURDATE(), INTERVAL 30 DAY);
+
+    -- Delete the settled loans from main table
+    DELETE FROM loan
+    WHERE updatedAmount = 0
+    AND endDate IS NOT NULL
+    AND endDate < DATE_SUB(CURDATE(), INTERVAL 30 DAY);
+END$$
+DELIMITER ;
+
+-- Enable the event scheduler if not already enabled
+SET GLOBAL event_scheduler = ON;
+
+-- ----------------------------------------
+-- Migration 12: Create SMS Log Table
+-- ----------------------------------------
+
+-- Create SMS log table for tracking sent messages
+CREATE TABLE IF NOT EXISTS `sms_log` (
+  `smsLogId` int(11) NOT NULL AUTO_INCREMENT,
+  `userId` int(11) NOT NULL,
+  `customerPhone` varchar(20) NOT NULL,
+  `message` text NOT NULL,
+  `messageType` enum('reminder','overdue','custom') NOT NULL DEFAULT 'custom',
+  `status` enum('pending','sent','failed') NOT NULL DEFAULT 'pending',
+  `sentAt` datetime DEFAULT NULL,
+  `errorMessage` text DEFAULT NULL,
+  `createdAt` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`smsLogId`),
+  KEY `idx_userId` (`userId`),
+  KEY `idx_customerPhone` (`customerPhone`),
+  KEY `idx_status` (`status`),
+  KEY `idx_messageType` (`messageType`),
+  KEY `idx_sentAt` (`sentAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ----------------------------------------
+-- Migration 8: Create Reminders and Notifications Tables
+-- ----------------------------------------
+
+-- Create reminders table for storing customer payment reminders
+CREATE TABLE IF NOT EXISTS `reminders` (
+  `reminderId` int(11) NOT NULL AUTO_INCREMENT,
+  `custId` int(11) NOT NULL,
+  `loanId` int(11) DEFAULT NULL,
+  `userId` int(11) NOT NULL,
+  `reminderType` enum('interest','deposit','custom') NOT NULL DEFAULT 'interest',
+  `reminderTitle` varchar(255) NOT NULL,
+  `reminderMessage` text DEFAULT NULL,
+  `reminderDate` date NOT NULL,
+  `reminderTime` time NOT NULL DEFAULT '10:00:00',
+  `isRecurring` tinyint(1) NOT NULL DEFAULT 0,
+  `recurringInterval` enum('daily','weekly','monthly') DEFAULT NULL,
+  `isActive` tinyint(1) NOT NULL DEFAULT 1,
+  `isCompleted` tinyint(1) NOT NULL DEFAULT 0,
+  `completedAt` datetime DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`reminderId`),
+  KEY `idx_custId` (`custId`),
+  KEY `idx_loanId` (`loanId`),
+  KEY `idx_userId` (`userId`),
+  KEY `idx_reminderDate` (`reminderDate`),
+  KEY `idx_isActive` (`isActive`),
+  CONSTRAINT `fk_reminders_customer` FOREIGN KEY (`custId`) REFERENCES `customer` (`custId`) ON DELETE CASCADE,
+  CONSTRAINT `fk_reminders_loan` FOREIGN KEY (`loanId`) REFERENCES `loan` (`loanId`) ON DELETE CASCADE,
+  CONSTRAINT `fk_reminders_user` FOREIGN KEY (`userId`) REFERENCES `user` (`userId`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Create notifications table for storing app notifications
+CREATE TABLE IF NOT EXISTS `notifications` (
+  `notificationId` int(11) NOT NULL AUTO_INCREMENT,
+  `userId` int(11) NOT NULL,
+  `custId` int(11) DEFAULT NULL,
+  `loanId` int(11) DEFAULT NULL,
+  `reminderId` int(11) DEFAULT NULL,
+  `notificationType` enum('reminder','payment_due','system','custom') NOT NULL DEFAULT 'reminder',
+  `title` varchar(255) NOT NULL,
+  `message` text NOT NULL,
+  `isRead` tinyint(1) NOT NULL DEFAULT 0,
+  `isActionRequired` tinyint(1) NOT NULL DEFAULT 0,
+  `actionType` enum('call_customer','add_payment','view_loan','none') DEFAULT 'none',
+  `actionData` json DEFAULT NULL,
+  `priority` enum('low','medium','high','urgent') NOT NULL DEFAULT 'medium',
+  `scheduledAt` datetime DEFAULT NULL,
+  `readAt` datetime DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`notificationId`),
+  KEY `idx_userId` (`userId`),
+  KEY `idx_custId` (`custId`),
+  KEY `idx_loanId` (`loanId`),
+  KEY `idx_reminderId` (`reminderId`),
+  KEY `idx_isRead` (`isRead`),
+  KEY `idx_notificationType` (`notificationType`),
+  KEY `idx_scheduledAt` (`scheduledAt`),
+  KEY `idx_priority` (`priority`),
+  CONSTRAINT `fk_notifications_customer` FOREIGN KEY (`custId`) REFERENCES `customer` (`custId`) ON DELETE CASCADE,
+  CONSTRAINT `fk_notifications_loan` FOREIGN KEY (`loanId`) REFERENCES `loan` (`loanId`) ON DELETE CASCADE,
+  CONSTRAINT `fk_notifications_reminder` FOREIGN KEY (`reminderId`) REFERENCES `reminders` (`reminderId`) ON DELETE CASCADE,
+  CONSTRAINT `fk_notifications_user` FOREIGN KEY (`userId`) REFERENCES `user` (`userId`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Create automatic reminder generation event
+DELIMITER $$
+CREATE EVENT IF NOT EXISTS `generate_payment_reminders`
+ON SCHEDULE EVERY 1 DAY
+STARTS CURRENT_TIMESTAMP
+ON COMPLETION PRESERVE
+ENABLE
+DO
+BEGIN
+    -- Generate reminders for loans with interest due in 2 days
+    INSERT INTO notifications (userId, custId, loanId, notificationType, title, message, isActionRequired, actionType, priority, scheduledAt)
+    SELECT
+        l.userId,
+        l.custId,
+        l.loanId,
+        'payment_due',
+        CONCAT('Payment Reminder - ', c.custName),
+        CONCAT('Interest payment is due in 2 days for ', c.custName, '. Amount: ₹', CAST(l.totalInterest AS DECIMAL(10,2))),
+        1,
+        'call_customer',
+        'high',
+        DATE_ADD(CURDATE(), INTERVAL 2 DAY)
+    FROM loan l
+    INNER JOIN customer c ON l.custId = c.custId
+    WHERE DATE_ADD(l.startDate, INTERVAL 30 DAY) = DATE_ADD(CURDATE(), INTERVAL 2 DAY)
+    AND NOT EXISTS (
+        SELECT 1 FROM notifications n
+        WHERE n.loanId = l.loanId
+        AND n.notificationType = 'payment_due'
+        AND DATE(n.scheduledAt) = DATE_ADD(CURDATE(), INTERVAL 2 DAY)
+    );
+END$$
+DELIMITER ;
+
+-- Create notification cleanup event
+DELIMITER $$
+CREATE EVENT IF NOT EXISTS `cleanup_old_notifications`
+ON SCHEDULE EVERY 1 DAY
+STARTS CURRENT_TIMESTAMP
+ON COMPLETION PRESERVE
+ENABLE
+DO
+BEGIN
+    -- Delete read notifications older than 30 days
+    DELETE FROM notifications
+    WHERE isRead = 1
+    AND readAt < DATE_SUB(NOW(), INTERVAL 30 DAY);
+
+    -- Delete completed reminders older than 90 days
+    DELETE FROM reminders
+    WHERE isCompleted = 1
+    AND completedAt < DATE_SUB(NOW(), INTERVAL 90 DAY);
+END$$
+DELIMITER ;
+
+-- ----------------------------------------
+-- Migration 9: Add totalDailyInterest Column to Loan Table
+-- ----------------------------------------
+-- Add totalDailyInterest field to loan table (only if it doesn't exist)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'loan'
+     AND COLUMN_NAME = 'totalDailyInterest') = 0,
+    'ALTER TABLE loan ADD COLUMN totalDailyInterest DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT "Total accumulated daily interest amount"',
+    'SELECT "Column totalDailyInterest already exists in loan table"'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add totalDailyInterest field to historyloan table (only if it doesn't exist)
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'totalDailyInterest') = 0,
+    'ALTER TABLE historyloan ADD COLUMN totalDailyInterest DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT "Total accumulated daily interest amount"',
+    'SELECT "Column totalDailyInterest already exists in historyloan table"'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add missing columns to historyloan table
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'totalDeposite') = 0,
+    'ALTER TABLE historyloan ADD COLUMN totalDeposite INT(10) NOT NULL DEFAULT 0',
+    'SELECT "Column totalDeposite already exists in historyloan table"'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'interest') = 0,
+    'ALTER TABLE historyloan ADD COLUMN interest DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+    'SELECT "Column interest already exists in historyloan table"'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'totalInterest') = 0,
+    'ALTER TABLE historyloan ADD COLUMN totalInterest DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+    'SELECT "Column totalInterest already exists in historyloan table"'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'lastInterestUpdatedAt') = 0,
+    'ALTER TABLE historyloan ADD COLUMN lastInterestUpdatedAt DATE DEFAULT NULL',
+    'SELECT "Column lastInterestUpdatedAt already exists in historyloan table"'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'dailyInterest') = 0,
+    'ALTER TABLE historyloan ADD COLUMN dailyInterest DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+    'SELECT "Column dailyInterest already exists in historyloan table"'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ----------------------------------------
+-- Migration 10: Update Backup Trigger with New Columns
+-- ----------------------------------------
+-- Drop and recreate the backup trigger to include all columns
+DROP TRIGGER IF EXISTS `backupedLoan`;
+
+DELIMITER $$
+CREATE TRIGGER `backupedLoan` AFTER DELETE ON `loan` FOR EACH ROW BEGIN
+    INSERT INTO historyloan (loanId, amount, rate, startDate, endDate, image, note, updatedAmount, totalDeposite, type, userId, custId, interest, totalInterest, lastInterestUpdatedAt, dailyInterest, totalDailyInterest)
+    VALUES (OLD.loanId, OLD.amount, OLD.rate, OLD.startDate, OLD.endDate, OLD.image, OLD.note, OLD.updatedAmount, OLD.totalDeposite, OLD.type, OLD.userId, OLD.custId, OLD.interest, OLD.totalInterest, OLD.lastInterestUpdatedAt, OLD.dailyInterest, OLD.totalDailyInterest);
+END$$
+DELIMITER ;
+
+-- ----------------------------------------
+-- Migration 11: Interest Payment Trigger Updates
+-- ----------------------------------------
+-- Update interest payment trigger to handle totalInterest deduction
+DROP TRIGGER IF EXISTS `update_totalinterest_after_interest_payment`;
+
+DELIMITER $$
+CREATE TRIGGER `update_totalinterest_after_interest_payment` AFTER INSERT ON `interest` FOR EACH ROW BEGIN
+    DECLARE current_total_interest DECIMAL(10,2);
+    DECLARE new_total_interest DECIMAL(10,2);
+
+    -- Get current totalInterest for the loan
+    SELECT totalInterest INTO current_total_interest
+    FROM loan
+    WHERE loanId = NEW.loanId;
+
+    -- Calculate new totalInterest after payment deduction
+    SET new_total_interest = GREATEST(0, current_total_interest - NEW.interestAmount);
+
+    -- Update the loan table with new totalInterest
+    UPDATE loan
+    SET totalInterest = new_total_interest,
+        lastInterestUpdatedAt = CURDATE()
+    WHERE loanId = NEW.loanId;
+END$$
+DELIMITER ;
+
+-- ========================================
+-- END OF MIGRATION SCRIPTS
+-- ========================================
+
+SELECT 'All migration scripts completed successfully!' AS Status;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

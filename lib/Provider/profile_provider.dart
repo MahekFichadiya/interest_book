@@ -9,6 +9,10 @@ class ProfileProvider extends ChangeNotifier {
   String _userId = '';
   double _youGave = 0.0;
   double _youGot = 0.0;
+  double _youGaveInterest = 0.0;
+  double _youGotInterest = 0.0;
+  double _totalYouGave = 0.0;
+  double _totalYouGot = 0.0;
   bool _isLoadingMoneyInfo = false;
   String _moneyInfoError = '';
 
@@ -18,6 +22,10 @@ class ProfileProvider extends ChangeNotifier {
   String get userId => _userId;
   double get youGave => _youGave;
   double get youGot => _youGot;
+  double get youGaveInterest => _youGaveInterest;
+  double get youGotInterest => _youGotInterest;
+  double get totalYouGave => _totalYouGave;
+  double get totalYouGot => _totalYouGot;
   bool get isLoadingMoneyInfo => _isLoadingMoneyInfo;
   String get moneyInfoError => _moneyInfoError;
 
@@ -65,11 +73,19 @@ class ProfileProvider extends ChangeNotifier {
       final moneyInfo = await ProfileMoneyApi.getProfileMoneyInfo(_userId);
       _youGave = moneyInfo['you_gave'] ?? 0.0;
       _youGot = moneyInfo['you_got'] ?? 0.0;
+      _youGaveInterest = moneyInfo['you_gave_interest'] ?? 0.0;
+      _youGotInterest = moneyInfo['you_got_interest'] ?? 0.0;
+      _totalYouGave = moneyInfo['total_you_gave'] ?? 0.0;
+      _totalYouGot = moneyInfo['total_you_got'] ?? 0.0;
       _moneyInfoError = '';
     } catch (e) {
       _moneyInfoError = e.toString();
       _youGave = 0.0;
       _youGot = 0.0;
+      _youGaveInterest = 0.0;
+      _youGotInterest = 0.0;
+      _totalYouGave = 0.0;
+      _totalYouGot = 0.0;
     } finally {
       _isLoadingMoneyInfo = false;
       notifyListeners();

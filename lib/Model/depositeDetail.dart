@@ -4,6 +4,7 @@ class Depositedetail {
   final String depositeDate;
   final String depositeNote;
   final String loanId;
+  final String? depositeField;
 
   Depositedetail({
     required this.depositeId,
@@ -11,6 +12,7 @@ class Depositedetail {
     required this.depositeDate,
     required this.depositeNote,
     required this.loanId,
+    this.depositeField,
   });
 
   factory Depositedetail.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class Depositedetail {
       depositeDate: json['depositeDate']?.toString() ?? '',
       depositeNote: json['depositeNote']?.toString() ?? '',
       loanId: json['loanId']?.toString() ?? '',
+      depositeField: json['depositeField']?.toString() ?? 'cash',
     );
   }
 
@@ -30,6 +33,7 @@ class Depositedetail {
       'depositeDate': depositeDate,
       'depositeNote': depositeNote,
       'loanId': loanId,
+      'depositeField': depositeField,
     };
   }
 }

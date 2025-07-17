@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Model/backupedCustomerModel.dart';
+import '../Api/UrlConstant.dart';
 
 class Listofsettledcustomer extends StatefulWidget {
   const Listofsettledcustomer({super.key});
@@ -90,6 +91,42 @@ class _ListofsettledcustomerState extends State<Listofsettledcustomer> {
                   onTap: () {},
                   child: Card(
                     child: ListTile(
+                      leading: CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Colors.blueGrey[300],
+                        child: BackupedCustomerProvider.customers[index].custPic != null &&
+                               BackupedCustomerProvider.customers[index].custPic!.isNotEmpty
+                            ? ClipOval(
+                                child: Image.network(
+                                  "${UrlConstant.showImage}/${BackupedCustomerProvider.customers[index].custPic}",
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Text(
+                                      BackupedCustomerProvider.customers[index].custName.isNotEmpty
+                                          ? BackupedCustomerProvider.customers[index].custName[0].toUpperCase()
+                                          : '',
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              )
+                            : Text(
+                                BackupedCustomerProvider.customers[index].custName.isNotEmpty
+                                    ? BackupedCustomerProvider.customers[index].custName[0].toUpperCase()
+                                    : '',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
                       title: Text(
                           BackupedCustomerProvider.customers[index].custName),
                       subtitle: Text(formateDate(

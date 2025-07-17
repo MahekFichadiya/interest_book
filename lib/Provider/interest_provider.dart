@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Api/interest.dart';
+import 'package:interest_book/Api/remove_interest.dart';
 import 'package:interest_book/Model/interestDetail.dart';
 
 class Interestprovider extends ChangeNotifier {
@@ -24,6 +25,27 @@ class Interestprovider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  // Force immediate refresh for real-time updates
+  void forceRefresh() {
+    notifyListeners();
+  }
+
+  // Delete interest by interestId
+  Future<bool> deleteInterest(String interestId) async {
+    try {
+      final success = await RemoveInterest().remove(interestId);
+      if (success) {
+        // Remove the interest from the local list
+        _interest.removeWhere((interest) => interest.InterestId == interestId);
+        notifyListeners();
+      }
+      return success;
+    } catch (e) {
+      _errorMessage = "Failed to delete interest: $e";
+      return false;
     }
   }
 }

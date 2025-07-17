@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:interest_book/Api/UrlConstant.dart';
 import 'package:interest_book/Api/update_loan_api.dart';
+import 'package:interest_book/Api/loan_document_api.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanDashborad.dart';
 import 'package:interest_book/Model/CustomerModel.dart';
 import 'package:interest_book/Model/LoanDetail.dart';
+import 'package:interest_book/Model/LoanDocument.dart';
 import 'package:interest_book/Provider/loan_provider.dart';
 import 'package:interest_book/Provider/profile_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -34,8 +36,9 @@ class _EditLoanState extends State<EditLoan> {
   TextEditingController noteController = TextEditingController();
   String? userId = ' ';
   String? custId = ' ';
-  File? _image;
-  File? _localImage;
+  List<LoanDocument> _existingDocuments = [];
+  List<File> _newDocuments = [];
+  bool _isLoadingDocuments = false;
 
   // loadData() async {
   //   final prefs = await SharedPreferences.getInstance();
@@ -132,6 +135,15 @@ class _EditLoanState extends State<EditLoan> {
     super.initState();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Load documents after userId is available
+    if (userId != null && userId!.trim().isNotEmpty) {
+      _loadExistingDocuments();
+    }
+  }
+
   Future<void> _selectStartDate(BuildContext context) async {
     final DateTime? startDate = await showDatePicker(
       context: context,
@@ -192,16 +204,106 @@ class _EditLoanState extends State<EditLoan> {
     return "";
   }
 
+  // Load existing documents for this loan
+  Future<void> _loadExistingDocuments() async {
+    if (userId == null) return;
+
+    setState(() {
+      _isLoadingDocuments = true;
+    });
+
+    try {
+      final documents = await LoanDocumentApi().getLoanDocuments(
+        widget.details.loanId,
+        userId!
+      );
+      setState(() {
+        _existingDocuments = documents;
+        _isLoadingDocuments = false;
+      });
+    } catch (e) {
+      print("Error loading documents: $e");
+      setState(() {
+        _isLoadingDocuments = false;
+      });
+    }
+  }
+
   Future _pickImage(ImageSource source) async {
     try {
       final image = await ImagePicker().pickImage(source: source);
       if (image == null) return;
       setState(() {
-        _localImage = File(image.path);
+        _newDocuments.add(File(image.path));
         Navigator.of(context).pop();
       });
     } on PlatformException {
       Navigator.of(context).pop();
+    }
+  }
+
+  Future _pickMultipleImages() async {
+    try {
+      final List<XFile> images = await ImagePicker().pickMultipleMedia();
+      if (images.isEmpty) return;
+      setState(() {
+        for (var image in images) {
+          _newDocuments.add(File(image.path));
+        }
+      });
+    } on PlatformException catch (e) {
+      print("Error picking multiple images: $e");
+    }
+  }
+
+  void _removeNewDocument(int index) {
+    setState(() {
+      _newDocuments.removeAt(index);
+    });
+  }
+
+  Future<void> _removeExistingDocument(LoanDocument document) async {
+    if (userId == null) return;
+
+    try {
+      bool success = await LoanDocumentApi().deleteLoanDocument(
+        document.documentId.toString(),
+        userId!
+      );
+
+      if (success) {
+        setState(() {
+          _existingDocuments.removeWhere((doc) => doc.documentId == document.documentId);
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Document deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to delete document'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print("Error deleting document: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting document: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -285,7 +387,7 @@ class _EditLoanState extends State<EditLoan> {
                       _buildTextField(
                         amountController,
                         "Amount",
-                        Icons.attach_money_rounded,
+                        Icons.currency_rupee,
                         TextInputType.number,
                       ),
                       _buildTextField(
@@ -307,9 +409,7 @@ class _EditLoanState extends State<EditLoan> {
                         _selectEndDate,
                         isOptional: true,
                       ),
-                      _buildImageSelector(),
-                      const SizedBox(height: 10),
-                      _buildImagePreview(),
+                      _buildDocumentsSection(),
                       const SizedBox(height: 10),
                       _buildTextField(
                         noteController,
@@ -412,28 +512,183 @@ class _EditLoanState extends State<EditLoan> {
     );
   }
 
-  Widget _buildImageSelector() {
+  Widget _buildDocumentsSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      child: TextFormField(
-        readOnly: true,
-        decoration: InputDecoration(
-          labelText:
-              (widget.details.image.isNotEmpty || _localImage != null)
-                  ? "Change Image"
-                  : "Select Image",
-          prefixIcon: const Icon(Icons.camera_alt_outlined),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey),
+          borderRadius: BorderRadius.circular(12),
         ),
-        onTap: () => _showSelectPhotoOptions(context),
-        validator: (_) {
-          if (_image == null &&
-              _localImage == null &&
-              widget.details.image.isEmpty) {
-            return "Please select an image";
-          }
-          return null;
-        },
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.attach_file),
+                const SizedBox(width: 8),
+                Text(
+                  'Loan Documents',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Existing documents section
+            if (_isLoadingDocuments)
+              const Center(child: CircularProgressIndicator())
+            else if (_existingDocuments.isNotEmpty) ...[
+              Text(
+                'Existing Documents (${_existingDocuments.length})',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.blueGrey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _existingDocuments.length,
+                  itemBuilder: (context, index) {
+                    final document = _existingDocuments[index];
+                    return Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              LoanDocumentApi.getDocumentUrl(document.documentPath),
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.image_not_supported),
+                                );
+                              },
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: GestureDetector(
+                              onTap: () => _removeExistingDocument(document),
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // New documents section
+            if (_newDocuments.isNotEmpty) ...[
+              Text(
+                'New Documents (${_newDocuments.length})',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.green,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _newDocuments.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              _newDocuments[index],
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: GestureDetector(
+                              onTap: () => _removeNewDocument(index),
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Add documents buttons
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showSelectPhotoOptions(context),
+                    icon: const Icon(Icons.camera_alt),
+                    label: const Text('Add Single'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _pickMultipleImages,
+                    icon: const Icon(Icons.photo_library),
+                    label: const Text('Add Multiple'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -492,85 +747,7 @@ class _EditLoanState extends State<EditLoan> {
   //     );
   //   }
   // }
-  Widget _buildImagePreview() {
-    if (_localImage != null) {
-      return Image.file(
-        _localImage!,
-        height: 250,
-        width: double.infinity,
-        fit: BoxFit.cover,
-      );
-    } else if (widget.details.image.isNotEmpty) {
-      // Construct the full image URL
-      String imageUrl;
-      // Check if the image path already contains the base URL
-      if (widget.details.image.startsWith('http')) {
-        imageUrl = widget.details.image;
-      } else {
-        // Ensure there's no double slash between base URL and image path
-        final String imagePath =
-            widget.details.image.startsWith('/')
-                ? widget.details.image.substring(1)
-                : widget.details.image;
-        imageUrl = "${UrlConstant.showImage}/$imagePath";
-      }
-
-      return Image.network(
-        imageUrl,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 250,
-            width: double.infinity,
-            color: Colors.grey.shade100,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.image_outlined,
-                  size: 80,
-                  color: Colors.blueGrey,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Original image not available",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 16,
-                    color: Colors.blueGrey,
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          );
-        },
-        height: 250,
-        width: double.infinity,
-        fit: BoxFit.cover,
-      );
-    } else {
-      return Container(
-        height: 250,
-        width: double.infinity,
-        color: Colors.grey.shade200,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.add_photo_alternate, size: 80, color: Colors.grey),
-            const SizedBox(height: 16),
-            const Text(
-              "No image selected",
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-  }
+  // Image preview method removed - now handled in documents section
 
   // void _onSave() async {
   //   if (formKey.currentState!.validate()) {
@@ -652,25 +829,38 @@ class _EditLoanState extends State<EditLoan> {
       );
 
       try {
-        // Determine which image to send
-        File? imageToSend;
-        if (_localImage != null) {
-          imageToSend = _localImage;
-        } else if (_image != null) {
-          imageToSend = _image;
-        }
-
+        // Update loan with new documents
         var success = await updateLoan(
           widget.details.loanId,
           amountController.text,
           rateController.text,
           startDateController.text,
           endDateController.text,
-          imageToSend,
+          _newDocuments,
           noteController.text,
           userId!,
           custId!,
         );
+
+        // If loan update is successful and there are new documents, add them via API
+        if (success && _newDocuments.isNotEmpty) {
+          try {
+            await LoanDocumentApi().addMultipleLoanDocuments(
+              widget.details.loanId,
+              userId!,
+              _newDocuments,
+            );
+            // Reload documents to show the newly added ones
+            await _loadExistingDocuments();
+            // Clear new documents list
+            setState(() {
+              _newDocuments.clear();
+            });
+          } catch (e) {
+            print("Error adding documents: $e");
+            // Continue even if document addition fails
+          }
+        }
 
         // Close loading dialog
         if (mounted) {

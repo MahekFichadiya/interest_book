@@ -1,0 +1,86 @@
+-- Simplify loan_documents table structure
+-- This script removes unnecessary fields from loan_documents table
+-- Keep only: documentId, loanId, documentPath
+-- Created: 2025-07-04
+
+-- Step 1: Check current table structure
+DESCRIBE `loan_documents`;
+
+-- Step 2: Remove unnecessary columns from loan_documents table
+-- Remove documentName column
+ALTER TABLE `loan_documents` 
+DROP COLUMN IF EXISTS `documentName`;
+
+-- Remove documentType column
+ALTER TABLE `loan_documents` 
+DROP COLUMN IF EXISTS `documentType`;
+
+-- Remove fileSize column
+ALTER TABLE `loan_documents` 
+DROP COLUMN IF EXISTS `fileSize`;
+
+-- Remove uploadDate column
+ALTER TABLE `loan_documents` 
+DROP COLUMN IF EXISTS `uploadDate`;
+
+-- Step 3: Verify the simplified table structure
+DESCRIBE `loan_documents`;
+
+-- Step 4: Show sample data to verify everything is working
+SELECT 
+    documentId,
+    loanId,
+    documentPath
+FROM `loan_documents` 
+LIMIT 10;
+
+-- Step 5: Transfer data from loan.image field to loan_documents table
+-- Insert loan images into simplified loan_documents table
+INSERT INTO `loan_documents` (`loanId`, `documentPath`)
+SELECT
+    `loanId`,
+    `image` as `documentPath`
+FROM `loan`
+WHERE `image` IS NOT NULL
+  AND `image` != ''
+  AND `image` != 'null'
+  AND `loanId` NOT IN (
+    -- Avoid duplicates if this script is run multiple times
+    SELECT DISTINCT `loanId`
+    FROM `loan_documents`
+    WHERE `documentPath` IN (
+      SELECT `image` FROM `loan` WHERE `image` IS NOT NULL AND `image` != '' AND `image` != 'null'
+    )
+  );
+
+-- Step 6: Verify the data transfer
+SELECT
+    'Data Transfer Summary' as Status,
+    COUNT(*) as TotalDocuments,
+    COUNT(DISTINCT loanId) as LoansWithDocuments
+FROM `loan_documents`;
+
+-- Step 7: Show sample of transferred data
+SELECT
+    ld.documentId,
+    ld.loanId,
+    ld.documentPath,
+    l.amount,
+    l.custId
+FROM `loan_documents` ld
+JOIN `loan` l ON ld.loanId = l.loanId
+ORDER BY ld.documentId DESC
+LIMIT 10;
+
+-- Step 8: Show final table structure
+SHOW CREATE TABLE `loan_documents`;
+
+-- Final message
+SELECT 'loan_documents table simplified and data transferred successfully. Only documentId, loanId, and documentPath fields remain.' as Message;
+
+-- Step 9: Optional - Clear the image field from loan table after verification
+-- UNCOMMENT THE FOLLOWING LINES ONLY AFTER VERIFYING THE MIGRATION IS SUCCESSFUL
+/*
+UPDATE `loan` SET `image` = NULL WHERE `image` IS NOT NULL;
+ALTER TABLE `loan` DROP COLUMN `image`;
+*/

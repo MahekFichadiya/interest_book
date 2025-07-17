@@ -31,6 +31,16 @@ class CustomerProvider extends ChangeNotifier {
     }
   }
 
+  void removeCustomer(String custId) {
+    _customers.removeWhere((customer) => customer.custId == custId);
+    notifyListeners();
+  }
+
+  // Method to refresh the customer list from server
+  Future<void> refreshCustomerList(String userId) async {
+    await fetchCustomerList(userId);
+  }
+
   Customer? getCustomerById(String custId) {
     try {
       return _customers.firstWhere((c) => c.custId == custId);

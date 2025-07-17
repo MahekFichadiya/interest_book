@@ -1,0 +1,99 @@
+-- Simple Fix for Daily Interest Start Date
+-- Daily interest should start from the day AFTER monthly period ends
+-- Created: 2025-07-04
+
+-- PROBLEM ANALYSIS:
+-- Loan ID 78: Start May 19th, Today July 4th
+-- Monthly period: May 19th to June 19th (30 days) 
+-- Current daily calculation: June 19th to July 4th = 16 days (WRONG)
+-- Correct daily calculation: June 20th to July 4th = 15 days (CORRECT)
+
+-- SOLUTION: 
+-- When days_beyond_monthly > 0, subtract 1 to exclude the last day of monthly period
+
+-- Update the calculation logic for existing loans
+UPDATE loan 
+SET totalDailyInterest = CASE 
+    WHEN DATEDIFF(CURDATE(), DATE(startDate)) <= 30 THEN 0
+    ELSE 
+        CASE 
+            WHEN (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30)) = 0 THEN 0
+            ELSE ROUND(
+                dailyInterest * 
+                (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30) - 1), 2
+            )
+        END
+END
+WHERE updatedAmount > 0;
+
+-- Verification query for Loan ID 78
+SELECT 
+    loanId,
+    startDate,
+    CURDATE() as today,
+    DATEDIFF(CURDATE(), DATE(startDate)) as total_days,
+    FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) as complete_months,
+    DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30) as raw_days_beyond,
+    CASE 
+        WHEN (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30)) = 0 THEN 0
+        ELSE (DATEDIFF(CURDATE(), DATE(startDate)) - (FLOOR(DATEDIFF(CURDATE(), DATE(startDate)) / 30) * 30) - 1)
+    END as corrected_days_beyond,
+    dailyInterest,
+    totalDailyInterest,
+    'Should be 15 days for June 20-July 4' as expected_calculation
+FROM loan 
+WHERE loanId = 78;
+
+-- Expected results for Loan ID 78 (May 19th start, July 4th today):
+-- total_days: 46
+-- complete_months: 1
+-- raw_days_beyond: 16 (June 19-July 4)
+-- corrected_days_beyond: 15 (June 20-July 4) ✓
+-- totalDailyInterest: dailyInterest × 15
+
+-- Test with different scenarios:
+
+-- Scenario 1: Exactly 30 days (no daily interest)
+SELECT 
+    'Exactly 30 days' as scenario,
+    30 as total_days,
+    FLOOR(30 / 30) as complete_months,
+    30 - (FLOOR(30 / 30) * 30) as raw_days_beyond,
+    CASE 
+        WHEN (30 - (FLOOR(30 / 30) * 30)) = 0 THEN 0
+        ELSE (30 - (FLOOR(30 / 30) * 30) - 1)
+    END as corrected_days_beyond;
+-- Expected: corrected_days_beyond = 0 ✓
+
+-- Scenario 2: 31 days (1 day of daily interest)
+SELECT 
+    '31 days' as scenario,
+    31 as total_days,
+    FLOOR(31 / 30) as complete_months,
+    31 - (FLOOR(31 / 30) * 30) as raw_days_beyond,
+    CASE 
+        WHEN (31 - (FLOOR(31 / 30) * 30)) = 0 THEN 0
+        ELSE (31 - (FLOOR(31 / 30) * 30) - 1)
+    END as corrected_days_beyond;
+-- Expected: corrected_days_beyond = 0 (since raw = 1, corrected = 1-1 = 0) ✓
+
+-- Scenario 3: 32 days (1 day of daily interest)
+SELECT 
+    '32 days' as scenario,
+    32 as total_days,
+    FLOOR(32 / 30) as complete_months,
+    32 - (FLOOR(32 / 30) * 30) as raw_days_beyond,
+    CASE 
+        WHEN (32 - (FLOOR(32 / 30) * 30)) = 0 THEN 0
+        ELSE (32 - (FLOOR(32 / 30) * 30) - 1)
+    END as corrected_days_beyond;
+-- Expected: corrected_days_beyond = 1 (since raw = 2, corrected = 2-1 = 1) ✓
+
+-- This means:
+-- Day 30: End of monthly period (no daily interest)
+-- Day 31: First day after monthly period (no daily interest yet)
+-- Day 32: Second day after monthly period (1 day of daily interest)
+
+-- For your case (46 days):
+-- raw_days_beyond = 46 - 30 = 16
+-- corrected_days_beyond = 16 - 1 = 15 ✓ (June 20-July 4)

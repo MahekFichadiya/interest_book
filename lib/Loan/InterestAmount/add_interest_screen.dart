@@ -26,6 +26,7 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
   final _dateController = TextEditingController();
   final _noteController = TextEditingController();
   bool _isLoading = false;
+  String _selectedPaymentMethod = 'cash'; // Default to cash
 
   @override
   void initState() {
@@ -125,6 +126,7 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
         formattedDate,
         _noteController.text,
         widget.loanId,
+        _selectedPaymentMethod,
       );
 
       if (success) {
@@ -205,21 +207,22 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
+      body: SafeArea(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Form(
             key: _formKey,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 
                 // Amount Field
                 AmountFormField(
                   controller: _amountController,
                   label: "Amount",
                   hintText: "Enter interest amount",
-                  prefixIcon: Icons.attach_money_rounded,
+                  prefixIcon: Icons.currency_rupee,
                   showCurrencySymbol: false,
                   allowDecimals: false,
                 ),
@@ -233,7 +236,7 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
+                        color: Colors.grey.withValues(alpha: 0.1),
                         spreadRadius: 1,
                         blurRadius: 5,
                         offset: const Offset(0, 2),
@@ -269,7 +272,7 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
+                        color: Colors.grey.withValues(alpha: 0.1),
                         spreadRadius: 1,
                         blurRadius: 5,
                         offset: const Offset(0, 2),
@@ -278,7 +281,7 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
                   ),
                   child: TextFormField(
                     controller: _noteController,
-                    maxLines: 3,
+                    maxLines: 1,
                     decoration: const InputDecoration(
                       hintText: 'Note (Optional)',
                       hintStyle: TextStyle(color: Colors.grey),
@@ -287,8 +290,87 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
                     ),
                   ),
                 ),
-        
-                const SizedBox(height: 30),
+
+                const SizedBox(height: 16),
+
+                // Payment Method Radio Buttons
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                        spreadRadius: 1,
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Payment Method',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: RadioListTile<String>(
+                                title: const Text(
+                                  'Cash',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                value: 'cash',
+                                groupValue: _selectedPaymentMethod,
+                                onChanged: (String? value) {
+                                  setState(() {
+                                    _selectedPaymentMethod = value!;
+                                  });
+                                },
+                                activeColor: Colors.blueGrey[700],
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            Expanded(
+                              child: RadioListTile<String>(
+                                title: const Text(
+                                  'Online',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                value: 'online',
+                                groupValue: _selectedPaymentMethod,
+                                onChanged: (String? value) {
+                                  setState(() {
+                                    _selectedPaymentMethod = value!;
+                                  });
+                                },
+                                activeColor: Colors.blueGrey[700],
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
         
                 // Save Button
                 SizedBox(
@@ -322,6 +404,9 @@ class _AddInterestScreenState extends State<AddInterestScreen> {
                           ),
                   ),
                 ),
+
+                // Add bottom padding to prevent overflow
+                const SizedBox(height: 20),
               ],
             ),
           ),

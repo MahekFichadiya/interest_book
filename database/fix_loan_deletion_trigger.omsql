@@ -1,0 +1,93 @@
+-- Fix Loan Deletion Trigger
+-- This script fixes the loan deletion trigger that's causing the "Unknown column 'image'" error
+-- Created: 2025-07-05
+
+-- Step 1: Check if image column exists in loan table
+SET @column_exists = (
+    SELECT COUNT(*) 
+    FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = 'loan' 
+    AND COLUMN_NAME = 'image'
+);
+
+-- Step 2: Drop the old problematic trigger
+DROP TRIGGER IF EXISTS `backupedLoan`;
+
+-- Step 3: Create the correct trigger based on whether image column exists
+DELIMITER $$
+
+CREATE TRIGGER `backupedLoan` 
+BEFORE DELETE ON `loan` 
+FOR EACH ROW 
+BEGIN
+    DECLARE customer_name VARCHAR(100) DEFAULT 'Unknown Customer';
+    
+    -- Get customer name
+    SELECT custName INTO customer_name 
+    FROM customer 
+    WHERE custId = OLD.custId 
+    LIMIT 1;
+    
+    -- Insert into historyloan with proper field handling
+    IF @column_exists > 0 THEN
+        -- Image column exists, include it
+        INSERT INTO historyloan (
+            loanId, amount, rate, startDate, endDate, image, note, 
+            updatedAmount, type, userId, custId, custName, paymentMode
+        )
+        VALUES (
+            OLD.loanId, OLD.amount, OLD.rate, OLD.startDate, OLD.endDate, 
+            COALESCE(OLD.image, ''), OLD.note, OLD.updatedAmount, OLD.type, 
+            OLD.userId, OLD.custId, customer_name, COALESCE(OLD.paymentMode, 'cash')
+        );
+    ELSE
+        -- Image column doesn't exist, exclude it
+        INSERT INTO historyloan (
+            loanId, amount, rate, startDate, endDate, note, 
+            updatedAmount, type, userId, custId, custName, paymentMode
+        )
+        VALUES (
+            OLD.loanId, OLD.amount, OLD.rate, OLD.startDate, OLD.endDate, OLD.note,
+            OLD.updatedAmount, OLD.type, OLD.userId, OLD.custId, customer_name, 
+            COALESCE(OLD.paymentMode, 'cash')
+        );
+    END IF;
+    
+    -- Clean up loan documents (archive and delete)
+    -- First check if CleanupLoanDocuments procedure exists
+    IF (SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES 
+        WHERE ROUTINE_SCHEMA = DATABASE() 
+        AND ROUTINE_NAME = 'CleanupLoanDocuments') > 0 THEN
+        CALL CleanupLoanDocuments(OLD.loanId);
+    ELSE
+        -- Fallback: manually archive and delete documents
+        INSERT INTO `history_loan_documents` (`loanId`, `documentPath`, `archivedDate`)
+        SELECT OLD.loanId, `documentPath`, NOW()
+        FROM `loan_documents` 
+        WHERE `loanId` = OLD.loanId;
+        
+        DELETE FROM `loan_documents` WHERE `loanId` = OLD.loanId;
+    END IF;
+END$$
+
+DELIMITER ;
+
+-- Step 4: Verify the trigger was created successfully
+SELECT 
+    'Trigger Status' as Status,
+    TRIGGER_NAME,
+    EVENT_MANIPULATION,
+    ACTION_TIMING,
+    ACTION_STATEMENT
+FROM INFORMATION_SCHEMA.TRIGGERS 
+WHERE TRIGGER_SCHEMA = DATABASE() 
+AND TRIGGER_NAME = 'backupedLoan';
+
+-- Step 5: Show current loan table structure
+DESCRIBE `loan`;
+
+-- Step 6: Show current historyloan table structure  
+DESCRIBE `historyloan`;
+
+SELECT 'Loan deletion trigger has been fixed. The trigger now handles both scenarios - with and without image column.' as Message;

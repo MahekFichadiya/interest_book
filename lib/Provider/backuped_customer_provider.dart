@@ -22,4 +22,9 @@ class backupedCustomerProvider extends ChangeNotifier {
     _customers.add(customer);
     notifyListeners();
   }
+
+  // Method to refresh the list after a customer is deleted
+  Future<void> refreshCustomerList(String userId) async {
+    await fetchCustomerList(userId);
+  }
 }

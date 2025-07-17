@@ -88,37 +88,58 @@ class _ContactListState extends State<ContactList> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final screenHeight = screenSize.height;
+    final screenWidth = screenSize.width;
+    final isSmallScreen = screenHeight < 700;
+    final isTablet = screenWidth > 600;
+
+    // Responsive dimensions
+    final titleFontSize = isSmallScreen ? 16.0 : 18.0;
+    final iconSize = isSmallScreen ? 20.0 : 24.0;
+    final searchFontSize = isSmallScreen ? 14.0 : 16.0;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blueGrey[300],
+        toolbarHeight: isSmallScreen ? 50 : 56,
         title: isSearching
             ? TextField(
                 autofocus: true,
                 controller: _searchController,
                 onChanged: performSearch,
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: searchFontSize,
+                ),
                 decoration: InputDecoration(
                   hintText: "Search Contacts..",
                   border: InputBorder.none,
-                  hintStyle: TextStyle(color: Colors.black.withValues(alpha: 0.5)),
+                  hintStyle: TextStyle(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    fontSize: searchFontSize,
+                  ),
+                  contentPadding: EdgeInsets.symmetric(
+                    vertical: isSmallScreen ? 8 : 12,
+                  ),
                 ),
                 cursorColor: Colors.black26,
-                style: const TextStyle(color: Colors.black),
               )
             : Text(
                 widget.title,
+                style: TextStyle(
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-        titleSpacing: -5,
-        leading: isSearching
-            ? IconButton(
-                onPressed: toggleSearch,
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
-              )
-            : IconButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
-              ),
+        titleSpacing: isSmallScreen ? -8 : -5,
+        leading: IconButton(
+          onPressed: isSearching ? toggleSearch : () => Navigator.pop(context),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: iconSize,
+          ),
+        ),
         actions: [
           IconButton(
             onPressed: () {
@@ -130,91 +151,133 @@ class _ContactListState extends State<ContactList> {
                 ),
               );
             },
-            icon: const Icon(Icons.edit),
+            icon: Icon(
+              Icons.edit,
+              size: iconSize,
+            ),
           ),
           if (!isSearching)
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.search,
                 color: Colors.black,
+                size: iconSize,
               ),
               onPressed: toggleSearch,
             ),
           if (isSearching)
             IconButton(
               onPressed: resetContacts,
-              icon: const Icon(
+              icon: Icon(
                 Icons.clear,
                 color: Colors.black,
+                size: iconSize,
               ),
             ),
         ],
       ),
-      body: isLoading
-    ? const Center(child: CircularProgressIndicator())
-    : contacts.isEmpty
-        ? const Center(child: Text('No contacts found'))
-        : ListView.builder(
-            itemCount: _searchController.text.isEmpty ? contacts.length : searchResults.length,
-            itemBuilder: (context, index) {
-              final contact = _searchController.text.isEmpty
-                  ? contacts[index]
-                  : searchResults[index];
-              return GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                      builder: (context) => AddNewContact(
-                        custName: contact.displayName,
-                        custPhn: contact.phones.isNotEmpty
-                            ? contact.phones[0].number
-                            : '',
-                      ),
-                    ));
-                  },
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.only(left: 16, right: 8),
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.blueGrey[300],
+      body: SafeArea(
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : contacts.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(isTablet ? 24.0 : 16.0),
                       child: Text(
-                        contact.displayName.isNotEmpty
-                            ? contact.displayName[0].toUpperCase()
-                            : '',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
+                        'No contacts found',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 16 : 18,
+                          color: Colors.blueGrey[600],
+                          fontWeight: FontWeight.w500,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
-                    title: Text(
-                      contact.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: Colors.black,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    subtitle: contact.phones.isNotEmpty
-                        ? Text(
-                            contact.phones[0].number,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.blueGrey,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          )
-                        : const SizedBox(),
-                    // trailing: IconButton(
-                    //   icon: const Icon(Icons.phone),
-                    //   onPressed: () => _makeCall(contact),
-                    // ),
-                  ),
-                );
-            },
-          ),
+                  )
+                : ListView.builder(
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _searchController.text.isEmpty ? contacts.length : searchResults.length,
+                    itemBuilder: (context, index) {
+                      final contact = _searchController.text.isEmpty
+                          ? contacts[index]
+                          : searchResults[index];
 
+                      // Responsive dimensions for list items
+                      final avatarRadius = isSmallScreen ? 20.0 : 25.0;
+                      final titleFontSize = isSmallScreen ? 14.0 : 15.0;
+                      final subtitleFontSize = isSmallScreen ? 11.0 : 12.0;
+                      final avatarTextSize = isSmallScreen ? 16.0 : 20.0;
+
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(MaterialPageRoute(
+                            builder: (context) => AddNewContact(
+                              custName: contact.displayName,
+                              custPhn: contact.phones.isNotEmpty
+                                  ? contact.phones[0].number
+                                  : '',
+                            ),
+                          ));
+                        },
+                        child: Card(
+                          margin: EdgeInsets.symmetric(
+                            horizontal: isTablet ? 16 : 8,
+                            vertical: isSmallScreen ? 2 : 4,
+                          ),
+                          elevation: 1,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ListTile(
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: isTablet ? 20 : 16,
+                              vertical: isSmallScreen ? 4 : 8,
+                            ),
+                            leading: CircleAvatar(
+                              radius: avatarRadius,
+                              backgroundColor: Colors.blueGrey[300],
+                              child: Text(
+                                contact.displayName.isNotEmpty
+                                    ? contact.displayName[0].toUpperCase()
+                                    : '',
+                                style: TextStyle(
+                                  fontSize: avatarTextSize,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              contact.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: titleFontSize,
+                                color: Colors.black,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: contact.phones.isNotEmpty
+                                ? Text(
+                                    contact.phones[0].number,
+                                    style: TextStyle(
+                                      fontSize: subtitleFontSize,
+                                      color: Colors.blueGrey[600],
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  )
+                                : null,
+                            trailing: Icon(
+                              Icons.arrow_forward_ios,
+                              size: isSmallScreen ? 14 : 16,
+                              color: Colors.blueGrey[400],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+      ),
     );
   }
 

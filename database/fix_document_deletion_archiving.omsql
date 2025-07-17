@@ -1,0 +1,90 @@
+-- Fix Document Deletion Archiving
+-- This script creates a trigger to automatically archive documents when deleted from loan_documents
+-- Created: 2025-07-04
+
+-- Step 1: Create trigger to archive documents when deleted from loan_documents
+DROP TRIGGER IF EXISTS `archive_document_on_delete`;
+
+DELIMITER $$
+CREATE TRIGGER `archive_document_on_delete` 
+BEFORE DELETE ON `loan_documents` 
+FOR EACH ROW 
+BEGIN
+    -- Archive the document before it's deleted
+    INSERT INTO `history_loan_documents` (`loanId`, `documentPath`, `archivedDate`)
+    VALUES (OLD.loanId, OLD.documentPath, NOW());
+END$$
+DELIMITER ;
+
+-- Step 2: Update the CleanupLoanDocuments procedure to avoid double archiving
+DROP PROCEDURE IF EXISTS `CleanupLoanDocuments`;
+
+DELIMITER $$
+CREATE PROCEDURE `CleanupLoanDocuments`(IN loan_id INT)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    
+    START TRANSACTION;
+    
+    -- Since we now have a trigger that automatically archives documents on delete,
+    -- we just need to delete the documents and the trigger will handle archiving
+    DELETE FROM `loan_documents` WHERE `loanId` = loan_id;
+    
+    COMMIT;
+END$$
+DELIMITER ;
+
+-- Step 3: Test the trigger by showing current state
+SELECT 'Document Archiving Fix Applied' as Status;
+
+-- Show current documents
+SELECT 
+    'Current Active Documents' as TableName,
+    COUNT(*) as TotalDocuments,
+    COUNT(DISTINCT loanId) as LoansWithDocuments
+FROM `loan_documents`;
+
+SELECT 
+    'Current History Documents' as TableName,
+    COUNT(*) as TotalDocuments,
+    COUNT(DISTINCT loanId) as LoansWithDocuments
+FROM `history_loan_documents`;
+
+-- Step 4: Show the triggers that are now active
+SELECT 
+    TRIGGER_NAME as TriggerName,
+    EVENT_MANIPULATION as Event,
+    EVENT_OBJECT_TABLE as TableName,
+    TRIGGER_SCHEMA as DatabaseName
+FROM INFORMATION_SCHEMA.TRIGGERS 
+WHERE TRIGGER_SCHEMA = DATABASE() 
+AND (TRIGGER_NAME = 'archive_document_on_delete' OR TRIGGER_NAME = 'backupedLoan')
+ORDER BY TRIGGER_NAME;
+
+-- Step 5: Show sample test (optional - uncomment to test)
+/*
+-- Test the trigger (UNCOMMENT ONLY IF YOU WANT TO TEST)
+-- This will create a test document and then delete it to verify archiving works
+
+-- Insert a test document (replace 999 with an actual loanId from your loan table)
+INSERT INTO loan_documents (loanId, documentPath) 
+VALUES (999, 'test/document/path.jpg');
+
+-- Check it was inserted
+SELECT 'Test document inserted' as Status, COUNT(*) as Count 
+FROM loan_documents WHERE documentPath = 'test/document/path.jpg';
+
+-- Delete the test document (this should trigger archiving)
+DELETE FROM loan_documents WHERE documentPath = 'test/document/path.jpg';
+
+-- Check it was archived
+SELECT 'Test document archived' as Status, COUNT(*) as Count 
+FROM history_loan_documents WHERE documentPath = 'test/document/path.jpg';
+*/
+
+-- Final message
+SELECT 'Document deletion archiving is now working! Documents will be automatically archived when deleted from loan_documents table.' as Message;

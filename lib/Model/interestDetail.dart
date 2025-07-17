@@ -5,12 +5,14 @@ class Interestdetail {
     required this.interestDate,
     required this.interestNote,
     required this.loanId,
+    this.interestField,
   });
   late final String InterestId;
   late final String interestAmount;
   late final String interestDate;
   late final String interestNote;
   late final String loanId;
+  late final String? interestField;
   
   Interestdetail.fromJson(Map<String, dynamic> json){
     InterestId = json['InterestId'];
@@ -18,15 +20,17 @@ class Interestdetail {
     interestDate = json['interestDate'];
     interestNote = json['interestNote'];
     loanId = json['loanId'];
+    interestField = json['interestField'] ?? 'cash';
   }
 
   Map<String, dynamic> toJson() {
-    final _data = <String, dynamic>{};
-    _data['InterestId'] = InterestId;
-    _data['interestAmount'] = interestAmount;
-    _data['interestDate'] = interestDate;
-    _data['interestNote'] = interestNote;
-    _data['loanId'] = loanId;
-    return _data;
+    final data = <String, dynamic>{};
+    data['InterestId'] = InterestId;
+    data['interestAmount'] = interestAmount;
+    data['interestDate'] = interestDate;
+    data['interestNote'] = interestNote;
+    data['loanId'] = loanId;
+    data['interestField'] = interestField;
+    return data;
   }
 }

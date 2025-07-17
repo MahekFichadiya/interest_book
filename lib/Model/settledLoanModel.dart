@@ -12,6 +12,7 @@ class Settledloanmodel {
     required this.userId,
     required this.custId,
     required this.custName,
+    required this.paymentMode,
   });
   late final String loanId;
   late final String amount;
@@ -25,36 +26,41 @@ class Settledloanmodel {
   late final String userId;
   late final String custId;
   late final String custName;
+  late final String paymentMode;
   
   Settledloanmodel.fromJson(Map<String, dynamic> json){
-    loanId = json['loanId'];
-    amount = json['amount'];
-    rate = json['rate'];
-    startDate = json['startDate'];
-    endDate = json['endDate'];
-    image = json['image'];
-    note = json['note'];
-    updatedAmount = json['updatedAmount'];
-    type = json['type'];
-    userId = json['userId'];
-    custId = json['custId'];
-    custName = json['custName'];
+    loanId = (json['loanId'] ?? '').toString();
+    amount = (json['amount'] ?? '').toString();
+    rate = (json['rate'] ?? '').toString();
+    startDate = (json['startDate'] ?? '').toString();
+    endDate = (json['endDate'] ?? '').toString();
+    image = (json['image'] ?? '').toString();
+    note = (json['note'] ?? '').toString();
+    updatedAmount = (json['updatedAmount'] ?? '').toString();
+    type = (json['type'] ?? '').toString();
+    userId = (json['userId'] ?? '').toString();
+    custId = (json['custId'] ?? '').toString();
+    // Handle custName with better fallback logic
+    String rawCustName = (json['custName'] ?? '').toString().trim();
+    custName = rawCustName.isNotEmpty && rawCustName != 'null' ? rawCustName : 'Unknown Customer';
+    paymentMode = (json['paymentMode'] ?? 'cash').toString();
   }
 
   Map<String, dynamic> toJson() {
-    final _data = <String, dynamic>{};
-    _data['loanId'] = loanId;
-    _data['amount'] = amount;
-    _data['rate'] = rate;
-    _data['startDate'] = startDate;
-    _data['endDate'] = endDate;
-    _data['image'] = image;
-    _data['note'] = note;
-    _data['updatedAmount'] = updatedAmount;
-    _data['type'] = type;
-    _data['userId'] = userId;
-    _data['custId'] = custId;
-    _data['custName'] = custName;
-    return _data;
+    final data = <String, dynamic>{};
+    data['loanId'] = loanId;
+    data['amount'] = amount;
+    data['rate'] = rate;
+    data['startDate'] = startDate;
+    data['endDate'] = endDate;
+    data['image'] = image;
+    data['note'] = note;
+    data['updatedAmount'] = updatedAmount;
+    data['type'] = type;
+    data['userId'] = userId;
+    data['custId'] = custId;
+    data['custName'] = custName;
+    data['paymentMode'] = paymentMode;
+    return data;
   }
 }

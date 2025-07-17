@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Api/update_profile_api.dart';
 import 'package:interest_book/Provider/profile_provider.dart';
+import 'package:interest_book/Utils/validation_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
@@ -93,15 +94,9 @@ class _UpdateProfileState extends State<UpdateProfile> {
                         label: Text('Phone Number'),
                         hintText: 'Enter Phone Number',
                         prefixIcon: Icon(Icons.phone),
+                        errorMaxLines: 2,
                       ),
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return "Field can't be empty";
-                        } else if (value.length < 10) {
-                          return "Your phone number is not proper";
-                        }
-                        return null;
-                      },
+                      validator: ValidationHelper.validateMobileNumber,
                     ),
                     TextFormField(
                       controller: emailcontroller,
@@ -110,6 +105,7 @@ class _UpdateProfileState extends State<UpdateProfile> {
                         label: Text("Email"),
                         prefixIcon: Icon(Icons.email),
                         hintText: "userName@gmail.com",
+                        errorMaxLines: 2,
                       ),
                       onChanged: (value) {
                         if (value.isNotEmpty) {
@@ -118,25 +114,20 @@ class _UpdateProfileState extends State<UpdateProfile> {
                           return;
                         }
                       },
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return "Field can't be emapty";
-                        } else if (!emailValidatorRegExp.hasMatch(value)) {
-                          return "Please enter valid Email";
-                        }
-                        return null;
-                      },
+                      validator: ValidationHelper.validateEmail,
                     ),
                     Padding(
                       padding: const EdgeInsets.only(top: 20),
                       child: GestureDetector(
                         onTap: () async {
-                          bool updateProfile = await UpdateProfileAPI().update(
-                            userId!,
-                            namecontroller.text,
-                            phncontroller.text,
-                            emailcontroller.text,
-                          );
+                          // Validate the form before proceeding
+                          if (formkey.currentState!.validate()) {
+                            bool updateProfile = await UpdateProfileAPI().update(
+                              userId!,
+                              namecontroller.text,
+                              phncontroller.text,
+                              emailcontroller.text,
+                            );
 
                           if (updateProfile) {
                             // Update SharedPreferences and Provider
@@ -165,6 +156,7 @@ class _UpdateProfileState extends State<UpdateProfile> {
                                   content: Text("Something went wrong...")),
                             );
                           }
+                          } // Close the validation if block
                         },
                         child: Container(
                           height: 70,

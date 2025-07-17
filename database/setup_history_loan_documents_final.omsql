@@ -1,0 +1,207 @@
+-- Setup History Loan Documents System (Final Version)
+-- This script creates the history loan documents system with proper error handling
+-- Created: 2025-07-04
+
+-- Step 1: Create history_loan_documents table if it doesn't exist
+CREATE TABLE IF NOT EXISTS `history_loan_documents` (
+  `documentId` int(11) NOT NULL AUTO_INCREMENT,
+  `loanId` int(5) NOT NULL COMMENT 'Original loan ID from historyloan table',
+  `documentPath` varchar(255) NOT NULL,
+  `archivedDate` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'When the document was moved to history',
+  PRIMARY KEY (`documentId`),
+  KEY `idx_history_loan_id` (`loanId`),
+  KEY `idx_archived_date` (`archivedDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Step 2: Drop existing procedure if it exists and create new one
+-- Use a more explicit approach to handle existing procedures
+SET @sql = 'DROP PROCEDURE IF EXISTS CleanupLoanDocuments';
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+DELIMITER $$
+CREATE PROCEDURE `CleanupLoanDocuments`(IN loan_id INT)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    
+    START TRANSACTION;
+    
+    -- First, archive the documents
+    INSERT INTO `history_loan_documents` (`loanId`, `documentPath`, `archivedDate`)
+    SELECT loan_id, `documentPath`, NOW()
+    FROM `loan_documents` 
+    WHERE `loanId` = loan_id;
+    
+    -- Then delete the original documents
+    DELETE FROM `loan_documents` WHERE `loanId` = loan_id;
+    
+    COMMIT;
+END$$
+DELIMITER ;
+
+-- Step 3: Update the loan_documents foreign key to allow manual cleanup
+-- Check and remove existing foreign key constraint
+SET @constraint_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                         WHERE TABLE_SCHEMA = DATABASE()
+                         AND TABLE_NAME = 'loan_documents'
+                         AND CONSTRAINT_NAME = 'fk_loan_documents_loan');
+
+SET @sql = IF(@constraint_exists > 0,
+    'ALTER TABLE `loan_documents` DROP FOREIGN KEY `fk_loan_documents_loan`',
+    'SELECT "Foreign key fk_loan_documents_loan does not exist" AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add new foreign key constraint without CASCADE
+SET @constraint_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                         WHERE TABLE_SCHEMA = DATABASE()
+                         AND TABLE_NAME = 'loan_documents'
+                         AND CONSTRAINT_NAME = 'fk_loan_documents_loan');
+
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE `loan_documents` 
+     ADD CONSTRAINT `fk_loan_documents_loan` 
+     FOREIGN KEY (`loanId`) REFERENCES `loan` (`loanId`) 
+     ON DELETE RESTRICT ON UPDATE CASCADE',
+    'SELECT "Foreign key fk_loan_documents_loan already exists" AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Step 4: Ensure historyloan table has required fields
+-- Add custName field if it doesn't exist
+SET @column_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE()
+                     AND TABLE_NAME = 'historyloan'
+                     AND COLUMN_NAME = 'custName');
+
+SET @sql = IF(@column_exists = 0,
+    'ALTER TABLE `historyloan` ADD COLUMN `custName` VARCHAR(100) DEFAULT "Unknown Customer" COMMENT "Customer name preserved from customer table"',
+    'SELECT "custName column already exists in historyloan table" AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add paymentMode field if it doesn't exist
+SET @column_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE()
+                     AND TABLE_NAME = 'historyloan'
+                     AND COLUMN_NAME = 'paymentMode');
+
+SET @sql = IF(@column_exists = 0,
+    'ALTER TABLE `historyloan` ADD COLUMN `paymentMode` VARCHAR(10) NOT NULL DEFAULT "cash" COMMENT "Payment method: cash or online"',
+    'SELECT "paymentMode column already exists in historyloan table" AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Step 5: Update the backupedLoan trigger
+-- Drop existing trigger
+DROP TRIGGER IF EXISTS `backupedLoan`;
+
+DELIMITER $$
+CREATE TRIGGER `backupedLoan` AFTER DELETE ON `loan` FOR EACH ROW 
+BEGIN
+    DECLARE customer_name VARCHAR(100) DEFAULT 'Unknown Customer';
+    
+    -- Get customer name
+    SELECT custName INTO customer_name 
+    FROM customer 
+    WHERE custId = OLD.custId 
+    LIMIT 1;
+    
+    -- If not found, try historycustomer table
+    IF customer_name IS NULL OR customer_name = '' THEN
+        SELECT custName INTO customer_name
+        FROM historycustomer 
+        WHERE custId = OLD.custId
+        LIMIT 1;
+    END IF;
+    
+    -- If still not found, use default
+    IF customer_name IS NULL OR customer_name = '' THEN
+        SET customer_name = 'Unknown Customer';
+    END IF;
+    
+    -- Insert into historyloan without image field
+    INSERT INTO historyloan (
+        loanId, amount, rate, startDate, endDate, note, 
+        updatedAmount, type, userId, custId, custName, paymentMode
+    )
+    VALUES (
+        OLD.loanId, OLD.amount, OLD.rate, OLD.startDate, OLD.endDate, OLD.note,
+        OLD.updatedAmount, OLD.type, OLD.userId, OLD.custId, customer_name, 
+        COALESCE(OLD.paymentMode, 'cash')
+    );
+    
+    -- Clean up loan documents (archive and delete)
+    CALL CleanupLoanDocuments(OLD.loanId);
+END$$
+DELIMITER ;
+
+-- Step 6: Show current status
+SELECT 'History Loan Documents Setup Complete' as Status;
+
+-- Check if tables exist and show counts
+SELECT 
+    'History Documents Table' as TableName,
+    CASE 
+        WHEN COUNT(*) > 0 THEN CONCAT(COUNT(*), ' documents found')
+        ELSE 'Table exists but empty'
+    END as Status
+FROM `history_loan_documents`;
+
+SELECT 
+    'Active Documents Table' as TableName,
+    CASE 
+        WHEN COUNT(*) > 0 THEN CONCAT(COUNT(*), ' documents found')
+        ELSE 'Table exists but empty'
+    END as Status
+FROM `loan_documents`;
+
+SELECT 
+    'History Loans Table' as TableName,
+    CASE 
+        WHEN COUNT(*) > 0 THEN CONCAT(COUNT(*), ' loans found')
+        ELSE 'Table exists but empty'
+    END as Status
+FROM `historyloan`;
+
+-- Show procedure exists
+SELECT 
+    'CleanupLoanDocuments Procedure' as Component,
+    CASE 
+        WHEN COUNT(*) > 0 THEN 'Created successfully'
+        ELSE 'Not found'
+    END as Status
+FROM INFORMATION_SCHEMA.ROUTINES 
+WHERE ROUTINE_SCHEMA = DATABASE() 
+AND ROUTINE_NAME = 'CleanupLoanDocuments';
+
+-- Show trigger exists
+SELECT 
+    'backupedLoan Trigger' as Component,
+    CASE 
+        WHEN COUNT(*) > 0 THEN 'Created successfully'
+        ELSE 'Not found'
+    END as Status
+FROM INFORMATION_SCHEMA.TRIGGERS 
+WHERE TRIGGER_SCHEMA = DATABASE() 
+AND TRIGGER_NAME = 'backupedLoan';
+
+-- Final success message
+SELECT 'History loan documents system is now ready for use!' as Message;

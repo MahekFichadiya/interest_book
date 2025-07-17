@@ -1,0 +1,90 @@
+-- Migrate Single Image to Multiple Documents System
+-- This script transfers existing single images from loan.image field to loan_documents table
+-- and removes the image field from loan table
+-- Created: 2025-07-05
+
+-- Step 1: Check current loan table structure and image data
+SELECT 
+    'Current Loan Images Status' as Status,
+    COUNT(*) as TotalLoans,
+    SUM(CASE WHEN image IS NOT NULL AND image != '' AND image != 'null' THEN 1 ELSE 0 END) as LoansWithImages,
+    SUM(CASE WHEN image IS NULL OR image = '' OR image = 'null' THEN 1 ELSE 0 END) as LoansWithoutImages
+FROM `loan`;
+
+-- Step 2: Ensure loan_documents table exists with correct structure
+CREATE TABLE IF NOT EXISTS `loan_documents` (
+  `documentId` int(11) NOT NULL AUTO_INCREMENT,
+  `loanId` int(5) NOT NULL,
+  `documentPath` varchar(255) NOT NULL,
+  PRIMARY KEY (`documentId`),
+  KEY `fk_loan_documents_loan` (`loanId`),
+  CONSTRAINT `fk_loan_documents_loan` FOREIGN KEY (`loanId`) REFERENCES `loan` (`loanId`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Step 3: Transfer existing images from loan.image to loan_documents table
+-- Only transfer non-null, non-empty images
+INSERT INTO `loan_documents` (`loanId`, `documentPath`)
+SELECT 
+    `loanId`, 
+    `image`
+FROM `loan` 
+WHERE `image` IS NOT NULL 
+  AND `image` != '' 
+  AND `image` != 'null'
+  AND `loanId` NOT IN (
+    SELECT DISTINCT `loanId` 
+    FROM `loan_documents`
+  );
+
+-- Step 4: Verify the transfer
+SELECT 
+    'Transfer Verification' as Status,
+    (SELECT COUNT(*) FROM loan WHERE image IS NOT NULL AND image != '' AND image != 'null') as OriginalImagesCount,
+    (SELECT COUNT(*) FROM loan_documents) as TransferredDocumentsCount;
+
+-- Step 5: Show sample of transferred documents
+SELECT 
+    'Sample Transferred Documents' as Status,
+    ld.documentId,
+    ld.loanId,
+    ld.documentPath,
+    l.amount,
+    l.note
+FROM loan_documents ld
+INNER JOIN loan l ON ld.loanId = l.loanId
+LIMIT 5;
+
+-- Step 6: Remove the image field from loan table
+-- First, let's backup the current structure
+CREATE TABLE IF NOT EXISTS `loan_backup_before_image_removal` AS 
+SELECT * FROM `loan` LIMIT 0;
+
+-- Add a comment to track when this migration was run
+ALTER TABLE `loan_backup_before_image_removal` 
+COMMENT = 'Backup table created before removing image field on 2025-07-05';
+
+-- Now remove the image field
+ALTER TABLE `loan` DROP COLUMN IF EXISTS `image`;
+
+-- Step 7: Verify the loan table structure after removal
+DESCRIBE `loan`;
+
+-- Step 8: Final verification - show loans and their documents
+SELECT 
+    'Final Verification' as Status,
+    l.loanId,
+    l.amount,
+    l.note,
+    COUNT(ld.documentId) as DocumentCount,
+    GROUP_CONCAT(ld.documentPath SEPARATOR ', ') as DocumentPaths
+FROM loan l
+LEFT JOIN loan_documents ld ON l.loanId = ld.loanId
+GROUP BY l.loanId, l.amount, l.note
+HAVING DocumentCount > 0
+LIMIT 10;
+
+-- Step 9: Show success message
+SELECT 'Migration completed successfully! Single images transferred to multiple documents system.' as Status;
+
+-- Step 10: Show next steps
+SELECT 'Next Steps: Update PHP backend and Flutter frontend to use loan_documents table instead of loan.image field' as NextSteps;

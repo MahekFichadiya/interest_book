@@ -60,10 +60,11 @@ try {
     $interval = $lastUpdateDate->diff($currentDate);
     $monthsSinceLastUpdate = $interval->y * 12 + $interval->m;
 
-    // Always update the monthly interest amount (ensures current calculation)
-    $updateInterestQuery = "UPDATE loan SET interest = ? WHERE loanId = ?";
+    // Always update the monthly interest and daily interest amounts (ensures current calculation)
+    $dailyInterest = round($monthlyInterest / 30, 2);
+    $updateInterestQuery = "UPDATE loan SET interest = ?, dailyInterest = ? WHERE loanId = ?";
     $updateInterestStmt = mysqli_prepare($con, $updateInterestQuery);
-    mysqli_stmt_bind_param($updateInterestStmt, "di", $monthlyInterest, $loanId);
+    mysqli_stmt_bind_param($updateInterestStmt, "ddi", $monthlyInterest, $dailyInterest, $loanId);
 
     if (!mysqli_stmt_execute($updateInterestStmt)) {
         throw new Exception("Failed to update monthly interest: " . mysqli_error($con));

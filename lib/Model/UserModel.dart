@@ -29,20 +29,20 @@ class Data {
     required this.name,
     required this.mobileNo,
     required this.email,
-    required this.password,
+    this.password,
   });
   late final String userId;
   late final String name;
   late final String mobileNo;
   late final String email;
-  late final String password;
+  late final String? password;
   
   Data.fromJson(Map<String, dynamic> json){
-    userId = json['userId'];
-    name = json['name'];
-    mobileNo = json['mobileNo'];
-    email = json['email'];
-    password = json['password'];
+    userId = json['userId']?.toString() ?? '';
+    name = json['name']?.toString() ?? '';
+    mobileNo = json['mobileNo']?.toString() ?? '';
+    email = json['email']?.toString() ?? '';
+    password = json['password']?.toString() ?? '';
   }
 
   Map<String, dynamic> toJson() {
@@ -51,7 +51,9 @@ class Data {
     _data['name'] = name;
     _data['mobileNo'] = mobileNo;
     _data['email'] = email;
-    _data['password'] = password;
+    if (password != null) {
+      _data['password'] = password;
+    }
     return _data;
   }
 }

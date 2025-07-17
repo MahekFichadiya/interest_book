@@ -1,0 +1,74 @@
+-- Drop and recreate the UpdateLoanCalculations procedure
+-- Run this script to fix the "PROCEDURE already exists" error
+-- Created: 2025-07-04
+
+-- Step 1: Drop existing procedure
+DROP PROCEDURE IF EXISTS `UpdateLoanCalculations`;
+
+-- Step 2: Recreate the procedure with corrected syntax
+DELIMITER $$
+
+CREATE PROCEDURE `UpdateLoanCalculations`(IN loan_id INT)
+BEGIN
+    -- All DECLARE statements must be at the beginning
+    DECLARE loan_amount DECIMAL(10,2);
+    DECLARE loan_rate DECIMAL(5,2);
+    DECLARE loan_start_date DATETIME;
+    DECLARE total_deposits DECIMAL(10,2);
+    DECLARE new_updated_amount DECIMAL(10,2);
+    DECLARE new_monthly_interest DECIMAL(10,2);
+    DECLARE new_daily_interest DECIMAL(10,2);
+    DECLARE new_total_daily_interest DECIMAL(10,2);
+    DECLARE total_days_passed INT;
+    DECLARE complete_months INT;
+    DECLARE days_beyond_monthly INT;
+    
+    -- Get loan details
+    SELECT amount, rate, startDate INTO loan_amount, loan_rate, loan_start_date
+    FROM loan 
+    WHERE loanId = loan_id;
+    
+    -- Calculate total deposits for this loan
+    SELECT COALESCE(SUM(depositeAmount), 0) INTO total_deposits
+    FROM deposite 
+    WHERE loanid = loan_id;
+    
+    -- Calculate new updated amount (remaining balance)
+    SET new_updated_amount = GREATEST(0, loan_amount - total_deposits);
+    
+    -- Calculate new monthly interest on remaining balance
+    SET new_monthly_interest = ROUND((new_updated_amount * loan_rate) / 100, 2);
+    
+    -- Calculate new daily interest
+    SET new_daily_interest = ROUND(new_monthly_interest / 30, 2);
+    
+    -- Calculate days beyond monthly calculation period
+    -- Daily interest only starts accumulating after complete months
+    SET total_days_passed = DATEDIFF(CURDATE(), DATE(loan_start_date));
+    SET complete_months = FLOOR(total_days_passed / 30);
+    SET days_beyond_monthly = total_days_passed - (complete_months * 30);
+    
+    -- Total daily interest only for days beyond monthly calculation
+    SET new_total_daily_interest = ROUND(new_daily_interest * GREATEST(0, days_beyond_monthly), 2);
+    
+    -- Update loan table with all calculated values
+    UPDATE loan 
+    SET 
+        totalDeposite = total_deposits,
+        updatedAmount = new_updated_amount,
+        interest = new_monthly_interest,
+        dailyInterest = new_daily_interest,
+        totalDailyInterest = new_total_daily_interest
+    WHERE loanId = loan_id;
+END$$
+
+DELIMITER ;
+
+-- Step 3: Verify the procedure was created
+SHOW PROCEDURE STATUS WHERE Name = 'UpdateLoanCalculations';
+
+-- Step 4: Test the procedure with a sample loan ID (replace 1 with actual loan ID)
+-- CALL UpdateLoanCalculations(1);
+
+-- Step 5: Show the procedure definition
+-- SHOW CREATE PROCEDURE UpdateLoanCalculations;

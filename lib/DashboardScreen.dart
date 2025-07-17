@@ -24,20 +24,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final screenHeight = screenSize.height;
+    final isSmallScreen = screenHeight < 700;
+
+    // Responsive dimensions
+    final iconSize = isSmallScreen ? 20.0 : 24.0;
+
     return Scaffold(
-      body: IndexedStack(
-        index: currentPage,
-        children: pages,
+      body: SafeArea(
+        child: IndexedStack(
+          index: currentPage,
+          children: pages,
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         destinations: [
-          NavigationDestination(icon: Icon(Icons.home), label: "Home"),
-          NavigationDestination(icon: Icon(Icons.person), label: "Profile"),
+          NavigationDestination(
+            icon: Icon(
+              Icons.home,
+              size: iconSize,
+            ),
+            label: "Home",
+          ),
+          NavigationDestination(
+            icon: Icon(
+              Icons.person,
+              size: iconSize,
+            ),
+            label: "Profile",
+          ),
         ],
         onDestinationSelected: (int index) {
           changeIndex(index);
         },
         selectedIndex: currentPage,
+        backgroundColor: Colors.white,
+        indicatorColor: Colors.blueGrey.withValues(alpha: 0.2),
+        height: isSmallScreen ? 60 : 70,
+        labelBehavior: isSmallScreen
+            ? NavigationDestinationLabelBehavior.onlyShowSelected
+            : NavigationDestinationLabelBehavior.alwaysShow,
       ),
     );
   }

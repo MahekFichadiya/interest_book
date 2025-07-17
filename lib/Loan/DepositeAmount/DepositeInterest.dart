@@ -60,7 +60,7 @@ class _DepositeInterestState extends State<DepositeInterest> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       label: Text("Amount"),
-                      prefixIcon: Icon(Icons.attach_money_rounded),
+                      prefixIcon: Icon(Icons.currency_rupee),
                     ),
                     onChanged: (value) {
                       if (value.isNotEmpty) {
@@ -131,6 +131,7 @@ class _DepositeInterestState extends State<DepositeInterest> {
                     formattedStartDate,
                     notecontroller.text,
                     widget.loanId.toString(),
+                    'cash', // Default to cash for this legacy call
                   );
                   if (add) {
                     // Now that it's a boolean, we continue here

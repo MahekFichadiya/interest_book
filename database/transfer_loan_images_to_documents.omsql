@@ -1,0 +1,116 @@
+-- Transfer loan images from loan.image field to loan_documents table
+-- This script moves all loan images to the simplified loan_documents table
+-- Works with the simplified table structure: documentId, loanId, documentPath
+-- Created: 2025-07-04
+
+-- Step 1: Check current loan table structure and image data
+SELECT 
+    'Current Loan Images' as Status,
+    COUNT(*) as TotalLoans,
+    SUM(CASE WHEN image IS NOT NULL AND image != '' AND image != 'null' THEN 1 ELSE 0 END) as LoansWithImages,
+    SUM(CASE WHEN image IS NULL OR image = '' OR image = 'null' THEN 1 ELSE 0 END) as LoansWithoutImages
+FROM `loan`;
+
+-- Step 2: Show sample of loan images to be transferred
+SELECT 
+    loanId,
+    image,
+    amount,
+    custId
+FROM `loan` 
+WHERE image IS NOT NULL 
+  AND image != '' 
+  AND image != 'null'
+ORDER BY loanId
+LIMIT 10;
+
+-- Step 3: Check current loan_documents table
+SELECT 
+    'Current Loan Documents' as Status,
+    COUNT(*) as TotalDocuments,
+    COUNT(DISTINCT loanId) as LoansWithDocuments
+FROM `loan_documents`;
+
+-- Step 4: Transfer loan images to loan_documents table
+INSERT INTO `loan_documents` (`loanId`, `documentPath`)
+SELECT 
+    `loanId`,
+    `image` as `documentPath`
+FROM `loan` 
+WHERE `image` IS NOT NULL 
+  AND `image` != '' 
+  AND `image` != 'null'
+  AND `loanId` NOT IN (
+    -- Avoid duplicates if this script is run multiple times
+    SELECT DISTINCT `loanId` 
+    FROM `loan_documents` 
+    WHERE `documentPath` IN (
+      SELECT `image` FROM `loan` WHERE `image` IS NOT NULL AND `image` != '' AND `image` != 'null'
+    )
+  );
+
+-- Step 5: Verify the data transfer
+SELECT 
+    'Transfer Results' as Status,
+    COUNT(*) as TotalDocumentsAfterTransfer,
+    COUNT(DISTINCT loanId) as LoansWithDocumentsAfterTransfer
+FROM `loan_documents`;
+
+-- Step 6: Show transferred data sample
+SELECT 
+    ld.documentId,
+    ld.loanId,
+    ld.documentPath,
+    l.amount,
+    l.note
+FROM `loan_documents` ld
+JOIN `loan` l ON ld.loanId = l.loanId
+ORDER BY ld.documentId DESC
+LIMIT 15;
+
+-- Step 7: Verify data integrity - check for any missing transfers
+SELECT 
+    'Data Integrity Check' as Status,
+    COUNT(*) as LoansWithImagesNotTransferred
+FROM `loan` l
+WHERE l.image IS NOT NULL 
+  AND l.image != '' 
+  AND l.image != 'null'
+  AND l.loanId NOT IN (
+    SELECT DISTINCT loanId FROM `loan_documents`
+  );
+
+-- Step 8: Show final statistics
+SELECT 
+    'Final Statistics' as Report,
+    (SELECT COUNT(*) FROM loan WHERE image IS NOT NULL AND image != '' AND image != 'null') as TotalLoanImages,
+    (SELECT COUNT(*) FROM loan_documents) as TotalDocuments,
+    (SELECT COUNT(DISTINCT loanId) FROM loan_documents) as LoansWithDocuments;
+
+-- Final success message
+SELECT 'Loan images transferred successfully to loan_documents table!' as Message;
+
+-- Step 9: Optional - Clear the image field from loan table after verification
+-- UNCOMMENT THE FOLLOWING LINES ONLY AFTER VERIFYING THE MIGRATION IS SUCCESSFUL
+/*
+-- Backup verification: Show loans that will lose image data
+SELECT 
+    loanId, 
+    image, 
+    amount, 
+    note,
+    'Will be cleared' as Action
+FROM loan 
+WHERE image IS NOT NULL 
+  AND image != '' 
+  AND image != 'null'
+LIMIT 10;
+
+-- Clear image field
+UPDATE `loan` SET `image` = NULL WHERE `image` IS NOT NULL;
+
+-- Optional: Remove image column entirely (CAREFUL - this is irreversible!)
+-- ALTER TABLE `loan` DROP COLUMN `image`;
+
+SELECT 'Image field cleared from loan table. Data is now in loan_documents table.' as FinalMessage;
+*/

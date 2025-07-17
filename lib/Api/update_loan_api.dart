@@ -10,7 +10,7 @@ Future<bool> updateLoan(
   String rate,
   String startDate,
   String endDate,
-  dynamic image,
+  List<File> newDocuments,
   String note,
   String userId,
   String custId,
@@ -39,11 +39,15 @@ Future<bool> updateLoan(
     request.fields['userId'] = userId;
     request.fields['custId'] = custId;
     
-    // Handle image upload - only send if a new image is selected
-    if (image != null && image is File && await image.exists()) {
-      request.files.add(
-        await http.MultipartFile.fromPath("image", image.path),
-      );
+    // Handle multiple documents upload
+    if (newDocuments.isNotEmpty) {
+      for (int i = 0; i < newDocuments.length; i++) {
+        if (await newDocuments[i].exists()) {
+          request.files.add(
+            await http.MultipartFile.fromPath("documents[]", newDocuments[i].path),
+          );
+        }
+      }
     }
     
     var response = await request.send();

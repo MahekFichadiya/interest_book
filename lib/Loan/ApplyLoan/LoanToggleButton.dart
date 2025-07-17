@@ -53,43 +53,46 @@ class _LoanToggleButtonState extends State<LoanToggleButton>
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Enhanced toggle buttons
+        // Card-style selection similar to payment mode
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blueGrey.withValues(alpha: 0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Loan Type',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blueGrey[700],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildLoanTypeCard(
+                    label: "You Gave",
+                    subtitle: "Money Lent",
+                    icon: Icons.trending_up_rounded,
+                    isSelected: isYouGive,
+                    color: Colors.red.shade600,
+                    onTap: () => _toggleLoanType(true),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildLoanTypeCard(
+                    label: "You Got",
+                    subtitle: "Money Borrowed",
+                    icon: Icons.trending_down_rounded,
+                    isSelected: !isYouGive,
+                    color: Colors.green.shade600,
+                    onTap: () => _toggleLoanType(false),
+                  ),
+                ],
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                _buildToggleButton(
-                  label: "You Gave ₹",
-                  icon: Icons.trending_up,
-                  isSelected: isYouGive,
-                  isLeft: true,
-                  onTap: () => _toggleLoanType(true),
-                ),
-                _buildToggleButton(
-                  label: "You Got ₹",
-                  icon: Icons.trending_down,
-                  isSelected: !isYouGive,
-                  isLeft: false,
-                  onTap: () => _toggleLoanType(false),
-                ),
-              ],
-            ),
-          ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         // Content area with animation
         SizedBox(
           height: MediaQuery.of(context).size.height * 0.7,
@@ -110,73 +113,78 @@ class _LoanToggleButtonState extends State<LoanToggleButton>
     );
   }
 
-  Widget _buildToggleButton({
+  Widget _buildLoanTypeCard({
     required String label,
+    required String subtitle,
     required IconData icon,
     required bool isSelected,
-    required bool isLeft,
+    required Color color,
     required VoidCallback onTap,
   }) {
     return Expanded(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.1) : Colors.white,
             borderRadius: BorderRadius.circular(12),
-            child: Container(
-              height: 80,
-              decoration: BoxDecoration(
-                gradient: isSelected
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.blueGrey.shade500,
-                          Colors.blueGrey.shade600,
-                        ],
-                      )
-                    : null,
-                color: isSelected ? null : Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected
-                      ? Colors.blueGrey.shade600
-                      : Colors.grey.shade300,
-                  width: 1.5,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: Colors.blueGrey.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    color: isSelected ? Colors.white : Colors.blueGrey.shade600,
-                    size: 24,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.blueGrey.shade700,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+            border: Border.all(
+              color: isSelected ? color : Colors.blueGrey.shade200,
+              width: isSelected ? 2 : 1,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: isSelected
+                    ? color.withValues(alpha: 0.2)
+                    : Colors.blueGrey.withValues(alpha: 0.1),
+                blurRadius: isSelected ? 8 : 4,
+                offset: const Offset(0, 2),
+                spreadRadius: isSelected ? 1 : 0,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon with background
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isSelected ? color : color.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: isSelected ? Colors.white : color,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Main label
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? color : Colors.blueGrey[700],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              // Subtitle
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: Colors.blueGrey[500],
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),

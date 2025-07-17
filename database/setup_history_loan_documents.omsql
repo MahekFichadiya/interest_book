@@ -1,0 +1,162 @@
+-- Setup History Loan Documents System
+-- This script creates a comprehensive system to handle documents for historical loans
+-- Created: 2025-07-04
+
+-- Step 1: Create history_loan_documents table
+CREATE TABLE IF NOT EXISTS `history_loan_documents` (
+  `documentId` int(11) NOT NULL AUTO_INCREMENT,
+  `loanId` int(5) NOT NULL COMMENT 'Original loan ID from historyloan table',
+  `documentPath` varchar(255) NOT NULL,
+  `archivedDate` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'When the document was moved to history',
+  PRIMARY KEY (`documentId`),
+  KEY `idx_history_loan_id` (`loanId`),
+  KEY `idx_archived_date` (`archivedDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Step 2: Create trigger to automatically move documents when loan is deleted
+DROP TRIGGER IF EXISTS `archive_loan_documents_on_delete`;
+
+DELIMITER $$
+CREATE TRIGGER `archive_loan_documents_on_delete` 
+BEFORE DELETE ON `loan` 
+FOR EACH ROW 
+BEGIN
+    -- Move all documents for this loan to history_loan_documents
+    INSERT INTO `history_loan_documents` (`loanId`, `documentPath`, `archivedDate`)
+    SELECT OLD.loanId, `documentPath`, NOW()
+    FROM `loan_documents` 
+    WHERE `loanId` = OLD.loanId;
+END$$
+DELIMITER ;
+
+-- Step 3: Modify the loan_documents foreign key to allow manual cleanup
+-- Remove the existing foreign key constraint
+ALTER TABLE `loan_documents` DROP FOREIGN KEY IF EXISTS `fk_loan_documents_loan`;
+
+-- Add a new foreign key constraint without CASCADE (we'll handle it manually)
+ALTER TABLE `loan_documents` 
+ADD CONSTRAINT `fk_loan_documents_loan` 
+FOREIGN KEY (`loanId`) REFERENCES `loan` (`loanId`) 
+ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Step 4: Create procedure to safely delete loan documents after archiving
+DROP PROCEDURE IF EXISTS `CleanupLoanDocuments`;
+
+DELIMITER $$
+CREATE PROCEDURE `CleanupLoanDocuments`(IN loan_id INT)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    
+    START TRANSACTION;
+    
+    -- First, archive the documents
+    INSERT INTO `history_loan_documents` (`loanId`, `documentPath`, `archivedDate`)
+    SELECT loan_id, `documentPath`, NOW()
+    FROM `loan_documents` 
+    WHERE `loanId` = loan_id;
+    
+    -- Then delete the original documents
+    DELETE FROM `loan_documents` WHERE `loanId` = loan_id;
+    
+    COMMIT;
+END$$
+DELIMITER ;
+
+-- Step 5: Update the backupedLoan trigger to use the cleanup procedure
+DROP TRIGGER IF EXISTS `backupedLoan`;
+
+DELIMITER $$
+CREATE TRIGGER `backupedLoan` AFTER DELETE ON `loan` FOR EACH ROW 
+BEGIN
+    DECLARE customer_name VARCHAR(100) DEFAULT 'Unknown Customer';
+    
+    -- Get customer name
+    SELECT custName INTO customer_name 
+    FROM customer 
+    WHERE custId = OLD.custId 
+    LIMIT 1;
+    
+    -- If not found, try historycustomer table
+    IF customer_name IS NULL OR customer_name = '' THEN
+        SELECT custName INTO customer_name
+        FROM historycustomer 
+        WHERE custId = OLD.custId
+        LIMIT 1;
+    END IF;
+    
+    -- If still not found, use default
+    IF customer_name IS NULL OR customer_name = '' THEN
+        SET customer_name = 'Unknown Customer';
+    END IF;
+    
+    -- Insert into historyloan without image field
+    INSERT INTO historyloan (
+        loanId, amount, rate, startDate, endDate, note, 
+        updatedAmount, type, userId, custId, custName, paymentMode
+    )
+    VALUES (
+        OLD.loanId, OLD.amount, OLD.rate, OLD.startDate, OLD.endDate, OLD.note,
+        OLD.updatedAmount, OLD.type, OLD.userId, OLD.custId, customer_name, 
+        COALESCE(OLD.paymentMode, 'cash')
+    );
+    
+    -- Clean up loan documents (archive and delete)
+    CALL CleanupLoanDocuments(OLD.loanId);
+END$$
+DELIMITER ;
+
+-- Step 6: Transfer existing historyloan image data to history_loan_documents
+-- Check if image column exists in historyloan table first
+SET @sql = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'historyloan'
+     AND COLUMN_NAME = 'image') > 0,
+    'INSERT INTO `history_loan_documents` (`loanId`, `documentPath`, `archivedDate`)
+     SELECT `loanId`, `image` as `documentPath`, NOW() as `archivedDate`
+     FROM `historyloan`
+     WHERE `image` IS NOT NULL
+       AND `image` != ""
+       AND `image` != "null"
+       AND `loanId` NOT IN (SELECT DISTINCT `loanId` FROM `history_loan_documents`)',
+    'SELECT "Image column does not exist in historyloan table - skipping image data transfer" AS message'
+));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Step 7: Show current status
+SELECT 'History Loan Documents Setup' as Status;
+
+SELECT 
+    'Current History Documents' as Report,
+    COUNT(*) as TotalHistoryDocuments,
+    COUNT(DISTINCT loanId) as HistoryLoansWithDocuments
+FROM `history_loan_documents`;
+
+SELECT 
+    'Current Active Documents' as Report,
+    COUNT(*) as TotalActiveDocuments,
+    COUNT(DISTINCT loanId) as ActiveLoansWithDocuments
+FROM `loan_documents`;
+
+-- Step 8: Show sample data
+SELECT 
+    hld.documentId,
+    hld.loanId,
+    hld.documentPath,
+    hld.archivedDate,
+    hl.amount,
+    hl.custName
+FROM `history_loan_documents` hld
+LEFT JOIN `historyloan` hl ON hld.loanId = hl.loanId
+ORDER BY hld.archivedDate DESC
+LIMIT 10;
+
+-- Final message
+SELECT 'History loan documents system setup complete!' as Message;
