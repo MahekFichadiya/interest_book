@@ -1,7 +1,7 @@
 class UrlConstant{
-  static const String baseUrl = "http://192.168.123.15/OmJavellerssHTML/";
+  static const String baseUrl = "http://192.168.243.15/OmJavellerssHTML/";
 
-  static const String showImage = 'http://192.168.123.15';
+  static const String showImage = 'http://192.168.243.15';
   static const String LoginApi = '${baseUrl}LoginApi.php';
   static const String SignupApi = '${baseUrl}SignupApi.php';
   static const String FatchCustomer = '${baseUrl}FatchCustomer.php';
@@ -40,15 +40,7 @@ class UrlConstant{
   static const String deleteLoanDocument = '${baseUrl}deleteLoanDocument.php';
   static const String getHistoryLoanDocuments = '${baseUrl}getHistoryLoanDocuments.php';
 
-  // Reminder and Notification APIs
-  static const String addReminder = '${baseUrl}addReminder.php';
-  static const String getReminders = '${baseUrl}getReminders.php';
-  static const String updateReminder = '${baseUrl}updateReminder.php';
-  static const String deleteReminder = '${baseUrl}deleteReminder.php';
-  static const String generateAutomaticReminders = '${baseUrl}generateAutomaticReminders.php';
-  static const String getNotifications = '${baseUrl}getNotifications.php';
-  static const String updateNotification = '${baseUrl}updateNotification.php';
-  static const String addOverdueNotification = '${baseUrl}addOverdueNotification.php';
+
 
   // SMS APIs
   static const String sendSms = '${baseUrl}sendSms.php';

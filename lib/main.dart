@@ -8,21 +8,15 @@ import 'package:interest_book/Provider/interest_provider.dart';
 import 'package:interest_book/Provider/loan_provider.dart';
 import 'package:interest_book/Provider/profile_provider.dart';
 import 'package:interest_book/Provider/settled_loan_provider.dart';
-import 'package:interest_book/Provider/reminder_provider.dart';
-import 'package:interest_book/Provider/notification_provider.dart';
-import 'package:interest_book/Services/reminder_scheduler.dart';
-import 'package:interest_book/Services/realtime_reminder_service.dart';
 import 'package:interest_book/Utils/app_colors.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize reminder scheduler
-  await ReminderScheduler().initialize();
-
-  // Start real-time reminder checking
-  RealtimeReminderService().startRealtimeChecking();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(const MyApp());
 }
@@ -37,30 +31,14 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<CustomerProvider>(
           create: (context) => CustomerProvider(),
         ),
-        ChangeNotifierProvider(
-          create: (_) => LoanProvider(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => Settledloanprovider(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => ProfileProvider()..loadProfile(),
-        ),
+        ChangeNotifierProvider(create: (_) => LoanProvider()),
+        ChangeNotifierProvider(create: (_) => Settledloanprovider()),
+        ChangeNotifierProvider(create: (_) => ProfileProvider()..loadProfile()),
         ChangeNotifierProvider<backupedCustomerProvider>(
           create: (context) => backupedCustomerProvider(),
         ),
-        ChangeNotifierProvider(
-          create: (context) => Interestprovider(),
-        ),
-        ChangeNotifierProvider(
-          create: (context) => Depositeprovider(),
-        ),
-        ChangeNotifierProvider(
-          create: (context) => ReminderProvider(),
-        ),
-        ChangeNotifierProvider(
-          create: (context) => NotificationProvider(),
-        ),
+        ChangeNotifierProvider(create: (context) => Interestprovider()),
+        ChangeNotifierProvider(create: (context) => Depositeprovider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -75,21 +53,57 @@ class MyApp extends StatelessWidget {
           dividerColor: AppColors.divider,
           // Enhanced text theme with better contrast
           textTheme: const TextTheme(
-            displayLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-            displayMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-            displaySmall: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-            headlineLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-            headlineMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-            headlineSmall: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-            titleLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-            titleMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
-            titleSmall: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+            displayLarge: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+            displayMedium: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+            displaySmall: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+            headlineLarge: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+            headlineMedium: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+            headlineSmall: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+            titleLarge: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+            titleMedium: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
+            titleSmall: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
             bodyLarge: TextStyle(color: AppColors.textPrimary),
             bodyMedium: TextStyle(color: AppColors.textSecondary),
             bodySmall: TextStyle(color: AppColors.textSecondary),
-            labelLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
-            labelMedium: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w500),
-            labelSmall: TextStyle(color: AppColors.textTertiary, fontWeight: FontWeight.w500),
+            labelLarge: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
+            labelMedium: TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+            labelSmall: TextStyle(
+              color: AppColors.textTertiary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           // Enhanced app bar theme
           appBarTheme: AppBarTheme(
@@ -98,7 +112,8 @@ class MyApp extends StatelessWidget {
             elevation: 2,
             shadowColor: AppColors.shadowMedium,
             systemOverlayStyle: const SystemUiOverlayStyle(
-              statusBarColor: AppColors.primaryDark, // Darker theme color for status bar
+              statusBarColor:
+                  AppColors.primaryDark, // Darker theme color for status bar
               statusBarIconBrightness: Brightness.light,
               statusBarBrightness: Brightness.dark,
             ),

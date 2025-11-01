@@ -98,23 +98,23 @@ class InterestDetailRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             flex: 2,
             child: Text(
               label,
               style: const TextStyle(fontSize: 16),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
+              softWrap: true,
             ),
           ),
           const SizedBox(width: 8),
-          Flexible(
+          Expanded(
             flex: 3,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (interestData['isAdvancePayment'] == true) ...[
                   Icon(
@@ -132,8 +132,7 @@ class InterestDetailRow extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                       color: interestData['color'] as Color,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
+                    softWrap: true,
                     textAlign: TextAlign.end,
                   ),
                 ),

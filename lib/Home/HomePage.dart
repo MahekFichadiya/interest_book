@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:interest_book/Contact/ContactList.dart';
 import 'package:interest_book/Home/CustomerList.dart';
 import 'package:interest_book/Utils/app_colors.dart';
 import 'package:interest_book/Utils/greeting_helper.dart';
 import 'package:interest_book/Widgets/app_logo.dart';
 import 'package:interest_book/Screens/logo_showcase.dart';
-import 'package:interest_book/Reminders/notifications_page.dart';
-import 'package:interest_book/Reminders/reminders_page.dart';
-import 'package:interest_book/Provider/notification_provider.dart';
-import 'package:interest_book/Services/notification_service.dart';
-import 'package:interest_book/Services/realtime_reminder_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
@@ -43,16 +37,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     loadName();
 
-    // Initialize notification service
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      NotificationService().initialize();
-      NotificationService().requestPermissions();
-      context.read<NotificationProvider>().updateUnreadCount();
-      context.read<NotificationProvider>().checkForOverdueNotifications();
 
-      // Ensure real-time reminder service is running
-      RealtimeReminderService().startRealtimeChecking();
-    });
 
     // Set status bar color
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -137,62 +122,6 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         actions: [
-          Consumer<NotificationProvider>(
-            builder: (context, notificationProvider, child) {
-              return Stack(
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const NotificationsPage(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.notifications_outlined),
-                  ),
-                  if (notificationProvider.hasUnreadNotifications)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Text(
-                          notificationProvider.unreadCount > 99
-                              ? '99+'
-                              : notificationProvider.unreadCount.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const RemindersPage(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.alarm),
-            tooltip: 'Reminders',
-          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.settings_outlined),
             onSelected: (value) {

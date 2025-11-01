@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:interest_book/Loan/LoanDashborad/LoanDashborad.dart';
 import 'package:interest_book/Provider/customer_provider.dart';
-import 'package:interest_book/Provider/reminder_provider.dart';
-import 'package:interest_book/Widgets/reminder_summary_card.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -36,11 +34,6 @@ class _CustomerListState extends State<CustomerList> {
     if (userId != null && userId.isNotEmpty && mounted) {
       await Provider.of<CustomerProvider>(context, listen: false)
           .fetchCustomerList(userId);
-      // Also load reminders
-      if (mounted) {
-        await Provider.of<ReminderProvider>(context, listen: false)
-            .loadReminders();
-      }
     }
   }
 
@@ -118,16 +111,9 @@ class _CustomerListState extends State<CustomerList> {
         return ListView.builder(
           controller: widget.scrollController,
           physics: const BouncingScrollPhysics(),
-          itemCount: filtered.length + 1, // +1 for reminder summary card
+          itemCount: filtered.length,
           itemBuilder: (context, index) {
-            // Show reminder summary card as first item
-            if (index == 0) {
-              return const ReminderSummaryCard();
-            }
-
-            // Adjust index for customer list
-            final customerIndex = index - 1;
-            final customer = filtered[customerIndex];
+            final customer = filtered[index];
             return GestureDetector(
               onTap: () {
                 Navigator.of(context).push(

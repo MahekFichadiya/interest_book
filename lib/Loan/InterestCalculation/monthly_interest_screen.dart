@@ -198,21 +198,31 @@ class _MonthlyInterestScreenState extends State<MonthlyInterestScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
+              ),
+              softWrap: true,
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isHighlight ? (highlightColor ?? Colors.green) : Colors.black,
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isHighlight ? (highlightColor ?? Colors.green) : Colors.black,
+              ),
+              textAlign: TextAlign.end,
+              softWrap: true,
             ),
           ),
         ],

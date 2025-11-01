@@ -1216,15 +1216,25 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
         border: Border.all(color: Colors.blueGrey[200]!),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          Expanded(
+            flex: 2,
+            child: Text(
+              title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              softWrap: true,
+            ),
           ),
-          Text(
-            AmountFormatter.formatCurrency(amount),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 1,
+            child: Text(
+              AmountFormatter.formatCurrency(amount),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.end,
+              softWrap: true,
+            ),
           ),
         ],
       ),
@@ -1235,12 +1245,25 @@ class _EntryDetailsScreenState extends State<EntryDetailsScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 16)),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 16),
+              softWrap: true,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.end,
+              softWrap: true,
+            ),
           ),
         ],
       ),
